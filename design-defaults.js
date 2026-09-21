@@ -27,6 +27,8 @@ const vars = [
   { key: 'ball-3', group: '抽獎機', label: '彩球 3（珊瑚）', type: 'color', default: '#ff7a8a' },
   { key: 'ball-4', group: '抽獎機', label: '彩球 4（薄荷）', type: 'color', default: '#5fd6a7' },
   { key: 'ball-5', group: '抽獎機', label: '彩球 5（薰衣草）', type: 'color', default: '#b59cff' },
+  { key: 'mix-speed', group: '抽獎機', label: '彩球轉速（0.1 很慢～1 正常）', type: 'text', default: '0.3' },
+  { key: 'name-char-delay', group: '抽獎機', label: '姓名逐字出現間隔（毫秒）', type: 'text', default: '650' },
   { key: 'tray-ball', group: '抽獎機', label: '中獎球', type: 'color', default: '#ffd35c' },
   // 圖片與 Logo
   { key: 'logo-height', group: '圖片與 Logo', label: '左上角 Logo 高度', type: 'text', default: '48px' },
@@ -39,8 +41,8 @@ const vars = [
   { key: 'btn-radius', group: '字型與尺寸', label: '按鈕圓角', type: 'text', default: '999px' },
   { key: 'reg-title-size', group: '字型與尺寸', label: '登記頁標題字級', type: 'text', default: 'clamp(28px, 5vw, 40px)' },
   { key: 'draw-title-size', group: '字型與尺寸', label: '抽獎頁標題字級', type: 'text', default: 'clamp(22px, 3vw, 34px)' },
-  { key: 'winner-size', group: '字型與尺寸', label: '中獎姓名字級', type: 'text', default: 'clamp(64px, 10vw, 128px)' },
-  { key: 'dept-size', group: '字型與尺寸', label: '中獎系所字級', type: 'text', default: 'clamp(22px, 3vw, 36px)' },
+  { key: 'winner-size', group: '字型與尺寸', label: '中獎姓名字級', type: 'text', default: 'clamp(110px, 17vw, 260px)' },
+  { key: 'dept-size', group: '字型與尺寸', label: '中獎系所字級', type: 'text', default: 'clamp(30px, 4vw, 56px)' },
   { key: 'machine-size', group: '字型與尺寸', label: '抽獎機大小', type: 'text', default: 'min(33vh, 76vw, 440px)' },
 ];
 

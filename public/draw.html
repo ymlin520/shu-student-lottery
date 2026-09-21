@@ -67,48 +67,58 @@
   .tray-ball.show { transform: translateX(-50%) scale(1); animation: trayDrop .8s cubic-bezier(.3,1.5,.5,1); }
   @keyframes trayDrop { 0% { transform: translateX(-50%) translateY(-120%) scale(.5); } 100% { transform: translateX(-50%) translateY(0) scale(1); } }
   .draw-btn { margin: 14px auto 0; width: min(320px, 80%); display: block; font-size: 22px; }
-  .result { margin-top: 4px; min-height: 190px; }
-  .result .nm { line-height: 1.1; }
-  .result .lbl { color: var(--text); font-size: 20px; letter-spacing: .1em; }
-  .result .prize { display: inline-block; margin-left: 8px; padding: 2px 12px; border-radius: 999px; background: rgba(216,172,90,.15); color: var(--gold-hi); font-size: 16px; }
-  .result .nm { font-size: var(--winner-size); font-weight: 900; letter-spacing: .14em; font-family: var(--font-display); color: var(--gold-hi); text-shadow: 0 0 24px rgba(216,172,90,.4); margin-top: 4px; }
-  .result .meta { color: var(--muted); font-size: 16px; }
-  .result .dept { font-family: var(--font-display); font-size: var(--dept-size); font-weight: 900; letter-spacing: .12em; color: var(--text);
-    text-shadow: 0 2px 10px rgba(40,0,4,.6); margin-top: 2px; animation: pop .45s cubic-bezier(.3,1.6,.5,1); }
-  .result .nm.waiting { color: var(--gold); letter-spacing: .4em; text-shadow: none; }
-  .result .nm.waiting span { display: inline-block; animation: blink 1s ease-in-out infinite; }
-  .result .nm.waiting span:nth-child(2) { animation-delay: .2s; }
-  .result .nm.waiting span:nth-child(3) { animation-delay: .4s; }
+  /* ===== 揭曉層：蓋在畫面中上方，抽獎機變暗，姓名一個字一個字出現 ===== */
+  .reveal { position: absolute; inset: 0; z-index: 25; pointer-events: none; display: flex; justify-content: center; align-items: flex-start;
+    padding: var(--reveal-top, 4vh) 16px 0; opacity: 0; transition: opacity .5s; }
+  .reveal.show { opacity: 1; }
+  .reveal::before { content: ""; position: absolute; inset: 0; z-index: -1;
+    background: radial-gradient(ellipse 75% 60% at 50% 30%, rgba(20, 0, 2, .84), rgba(20, 0, 2, .6) 55%, rgba(20, 0, 2, .3)); }
+  .reveal-inner { text-align: center; max-width: 100%; }
+  .reveal .lbl { color: var(--text); font-size: clamp(20px, 2.3vw, 32px); font-weight: 700; letter-spacing: .35em; text-shadow: 0 2px 10px rgba(0,0,0,.5); }
+  .reveal .dept { font-family: var(--font-display); font-size: var(--dept-size); font-weight: 900; letter-spacing: .14em; color: var(--gold-hi);
+    text-shadow: 0 3px 14px rgba(0, 0, 0, .55); margin-top: 8px; animation: pop .5s cubic-bezier(.3,1.6,.5,1); }
+  .reveal .meta { color: var(--muted); font-size: clamp(16px, 1.6vw, 22px); margin-top: 6px; }
+  .nm-wrap { position: relative; display: inline-block; isolation: isolate; margin-top: 2px; }
+  .reveal .nm { font-size: var(--winner-size); line-height: 1.12; font-weight: 900; font-family: var(--font-display); letter-spacing: .06em; white-space: nowrap;
+    filter: drop-shadow(0 0 20px rgba(255, 214, 130, .75)) drop-shadow(0 6px 0 rgba(90, 20, 0, .55)); }
+  .reveal .nm.waiting { color: var(--gold); font-size: calc(var(--winner-size) * .45); letter-spacing: .4em; filter: none; }
+  .reveal .nm.waiting span { display: inline-block; animation: blink 1s ease-in-out infinite; }
+  .reveal .nm.waiting span:nth-child(2) { animation-delay: .2s; }
+  .reveal .nm.waiting span:nth-child(3) { animation-delay: .4s; }
   @keyframes blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
-  /* 姓名揭曉：金色漸層字＋放大落下＋背後光芒爆開與旋轉光線 */
-  .nm-wrap { position: relative; display: inline-block; isolation: isolate; }
-  .result .nm.reveal {
+  /* 每個字：金色漸層，從大、模糊、上方重重落下 */
+  .nm .ch { display: inline-block; opacity: 0;
     background: linear-gradient(180deg, #fffbea 0%, var(--gold-hi) 38%, var(--gold) 72%, #fff1c2 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none;
-    filter: drop-shadow(0 0 16px rgba(255, 214, 130, .7)) drop-shadow(0 5px 0 rgba(90, 20, 0, .55));
-    animation: slam .75s cubic-bezier(.2, 1.35, .35, 1) both, glow 1.8s ease-in-out .75s infinite;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: charIn .75s cubic-bezier(.2, 1.35, .35, 1) forwards; }
+  @keyframes charIn {
+    0% { opacity: 0; transform: translateY(-35%) scale(2.6); filter: blur(10px); }
+    60% { opacity: 1; transform: translateY(0) scale(.9); filter: blur(0); }
+    100% { opacity: 1; transform: none; filter: none; }
   }
-  @keyframes slam {
-    0% { transform: scale(2.6); opacity: 0; letter-spacing: .6em; }
-    55% { transform: scale(.9); opacity: 1; }
-    100% { transform: scale(1); opacity: 1; letter-spacing: .14em; }
-  }
+  .reveal .nm.done { animation: glow 1.8s ease-in-out infinite; }
+  .machine, .stage h2 { transition: opacity .6s, filter .6s; }
+  .stage.revealing .machine, .stage.revealing h2 { opacity: .22; filter: blur(2px); }
+  .draw-btn { position: relative; z-index: 30; }
+  /* 揭曉時按鈕移到畫面最下方，不擋住姓名 */
+  .stage.revealing .draw-btn { position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%); margin: 0; }
+  .stage.revealing .draw-btn:active { transform: translateX(-50%) translateY(4px); }
   @keyframes glow {
     50% { filter: drop-shadow(0 0 34px rgba(255, 226, 150, 1)) drop-shadow(0 5px 0 rgba(90, 20, 0, .55)); }
   }
   .burst, .rays { position: absolute; left: 50%; top: 50%; pointer-events: none; z-index: -1; border-radius: 50%; }
-  .burst { width: 620px; height: 620px; transform: translate(-50%, -50%) scale(0);
+  .burst { width: 80vmin; height: 80vmin; transform: translate(-50%, -50%) scale(0);
     background: radial-gradient(circle, rgba(255, 240, 190, .95) 0%, rgba(255, 200, 90, .45) 28%, rgba(255, 160, 60, 0) 62%);
     animation: burst 1.2s ease-out forwards; }
   @keyframes burst { 0% { transform: translate(-50%, -50%) scale(0); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; } }
-  .rays { width: 760px; height: 760px; transform: translate(-50%, -50%); opacity: 0;
+  .rays { width: 110vmin; height: 110vmin; transform: translate(-50%, -50%); opacity: 0;
     background: repeating-conic-gradient(rgba(255, 222, 150, .30) 0deg 5deg, transparent 5deg 15deg);
     -webkit-mask: radial-gradient(circle, #000 12%, transparent 62%); mask: radial-gradient(circle, #000 12%, transparent 62%);
     animation: raysIn .8s ease-out .15s forwards, spin 22s linear infinite; }
   @keyframes raysIn { to { opacity: 1; } }
   @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
-  .flash { position: fixed; inset: 0; z-index: 30; pointer-events: none;
-    background: radial-gradient(circle at 50% 70%, rgba(255, 240, 200, .75), rgba(255, 210, 120, .25) 45%, transparent 75%);
+  .flash { position: fixed; inset: 0; z-index: 28; pointer-events: none;
+    background: radial-gradient(circle at 50% 30%, rgba(255, 240, 200, .75), rgba(255, 210, 120, .25) 45%, transparent 75%);
     animation: flash .7s ease-out forwards; }
   @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
   .tray-ball.hit { animation: trayDrop .8s cubic-bezier(.3,1.5,.5,1), trayGlow 1.8s ease-in-out .8s infinite; }
@@ -151,7 +161,7 @@
   </div>
   <button class="btn-gold draw-btn" id="drawBtn">開始抽獎</button>
   <span hidden data-t="draw.button">開始抽獎</span><span hidden data-t="draw.drawing">抽獎中…</span><span hidden data-t="draw.allDone">全部抽完了</span><span hidden data-t="draw.congrats">恭喜抽中</span><span hidden data-t="draw.former">原名</span>
-  <div class="result" id="result"></div>
+  <div class="reveal" id="reveal" aria-live="polite"><div class="reveal-inner" id="result"></div></div>
 </main>
 
 <script src="/assets/design.js"></script>
@@ -203,7 +213,8 @@ setInterval(() => { if (!DESIGN_PREVIEW && !drawing && !$('#stage').hidden) api(
 // ---------- 彩球物理 ----------
 const COLORS = ['c-gold', 'c-teal', 'c-pink', 'c-green', 'c-purple'];
 const drum = $('#drum');
-let balls = [], mixing = false, drawing = false;
+let balls = [], mixing = false, drawing = false, simDt = 1;
+const cssNum = (name, def) => { const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)); return Number.isFinite(v) && v > 0 ? v : def; };
 function dims() { const D = drum.clientWidth; return { D, R: D / 2, r: D * 0.068, hub: D * 0.135 + D * 0.012 }; }
 function buildBalls(n) {
   n = Math.min(n, 26);
@@ -223,18 +234,20 @@ function step() {
   const { D, R, r, hub } = dims();
   const live = balls.filter((b) => !b.picked);
   const g = D * 0.0011, limit = R * 0.93 - r, e = mixing ? 0.9 : 0.45;
+  const dt = mixing ? simDt : 1; // 攪拌時慢動作：同樣的翻滾軌跡，只是放慢
   for (const b of live) {
-    b.vy += g;
+    b.vy += g * dt;
     if (mixing) {
       // 底部往上吹的氣流＋繞圈旋轉＋亂流
       const dx = b.x - R, dy = b.y - R, dist = Math.hypot(dx, dy) || 1;
-      b.vx += (Math.random() - .5) * D * 0.014 + (-dy / dist) * D * 0.0022;
-      b.vy += (Math.random() - .5) * D * 0.014 + (dx / dist) * D * 0.0022 - (dy > 0 ? D * (0.004 + Math.random() * 0.006) : 0);
+      b.vx += ((Math.random() - .5) * D * 0.014 + (-dy / dist) * D * 0.0022) * dt;
+      b.vy += ((Math.random() - .5) * D * 0.014 + (dx / dist) * D * 0.0022 - (dy > 0 ? D * (0.004 + Math.random() * 0.006) : 0)) * dt;
     }
     const sp = Math.hypot(b.vx, b.vy), max = D * (mixing ? 0.045 : 0.02);
     if (sp > max) { b.vx *= max / sp; b.vy *= max / sp; }
-    b.vx *= 0.995; b.vy *= 0.995;
-    b.x += b.vx; b.y += b.vy;
+    const damp = Math.pow(0.995, dt);
+    b.vx *= damp; b.vy *= damp;
+    b.x += b.vx * dt; b.y += b.vy * dt;
     // 外圈
     let dx = b.x - R, dy = b.y - R, d = Math.hypot(dx, dy) || 1;
     if (d > limit) {
@@ -287,8 +300,11 @@ $('#drawBtn').addEventListener('click', async () => {
   if (drawing) return;
   drawing = true;
   const btn = $('#drawBtn'); btn.disabled = true; btn.textContent = T('draw.drawing');
-  $('#trayBall').classList.remove('show', 'waiting', 'hit'); $('#result').innerHTML = ''; $('#result').classList.remove('pop');
+  $('#trayBall').classList.remove('show', 'waiting', 'hit'); $('#result').innerHTML = '';
+  $('#reveal').classList.remove('show'); $('#stage').classList.remove('revealing');
   // 攪拌與抽籤同時開始，按下後 5 秒內出現姓名；獎項以後台設定為準
+  simDt = Math.min(cssNum('--mix-speed', 0.3), 2);
+  drum.querySelector('.hub').style.animationDuration = (1.2 / simDt) + 's'; // 中心 logo 也跟著慢轉
   mixing = true; drum.classList.add('spinning');
   let res;
   try {
@@ -308,7 +324,7 @@ $('#drawBtn').addEventListener('click', async () => {
     requestAnimationFrame(() => { pick.el.style.transform = `translate(${R - r}px, ${D + r}px)`; pick.el.style.opacity = '0'; });
     await sleep(500);
   }
-  // 出獎第一段：先顯示系所，姓名位置先放等待動畫（同名時靠系所區分）
+  // 出獎第一段：畫面中上方先出現「恭喜抽中」與系所（同名時靠系所區分）
   const w = res.winner, shown = maskName(w.name);
   const nameEl = $('#trayName'), tray = $('#trayBall');
   nameEl.textContent = '？';
@@ -318,19 +334,29 @@ $('#drawBtn').addEventListener('click', async () => {
   $('#result').innerHTML = `<div class="lbl">${esc(T('draw.congrats'))}</div>
     <div class="dept">${esc(w.dept || T('draw.deptEmpty'))}</div>
     <div class="nm-wrap"><div class="nm waiting"><span>•</span><span>•</span><span>•</span></div></div>`;
+  $('#reveal').classList.add('show'); $('#stage').classList.add('revealing');
   await sleep(REVEAL_DELAY);
 
-  // 第二段：揭曉姓名大字
-  nameEl.textContent = shown;
-  nameEl.style.fontSize = `calc(var(--size) * ${[...shown].length <= 3 ? .062 : [...shown].length <= 5 ? .048 : .034})`;
-  tray.classList.remove('waiting', 'show'); void tray.offsetWidth; tray.classList.add('show', 'hit');
+  // 第二段：姓名一個字一個字出現
+  const chars = [...shown];
   const nm = $('#result .nm');
-  const len = [...shown].length;
-  nm.style.fontSize = len <= 4 ? '' : len <= 8 ? 'calc(var(--winner-size) * .72)' : 'calc(var(--winner-size) * .48)';
   nm.classList.remove('waiting');
-  nm.textContent = shown;
-  nm.classList.add('reveal');
-  nm.insertAdjacentHTML('beforebegin', '<div class="rays"></div><div class="burst"></div>');
+  nm.innerHTML = '';
+  nm.style.fontSize = chars.length <= 4 ? '' : chars.length <= 8 ? 'calc(var(--winner-size) * .6)' : 'calc(var(--winner-size) * .4)';
+  nm.insertAdjacentHTML('beforebegin', '<div class="rays"></div>');
+  const charDelay = cssNum('--name-char-delay', 650);
+  for (const c of chars) {
+    const sp = document.createElement('span');
+    sp.className = 'ch';
+    sp.textContent = c === ' ' ? String.fromCharCode(160) : c;
+    nm.appendChild(sp);
+    const bu = document.createElement('div'); bu.className = 'burst'; nm.before(bu); setTimeout(() => bu.remove(), 1300);
+    await sleep(charDelay);
+  }
+  nm.classList.add('done');
+  nameEl.textContent = shown;
+  nameEl.style.fontSize = `calc(var(--size) * ${chars.length <= 3 ? .062 : chars.length <= 5 ? .048 : .034})`;
+  tray.classList.remove('waiting', 'show'); void tray.offsetWidth; tray.classList.add('show', 'hit');
   if (w.formerName && !info.settings.maskName) $('#result .nm-wrap').insertAdjacentHTML('afterend', `<div class="meta">（${esc(T('draw.former'))} ${esc(w.formerName)}）</div>`);
   const fl = document.createElement('div'); fl.className = 'flash'; $('#stage').appendChild(fl); setTimeout(() => fl.remove(), 800);
   confetti(); setTimeout(confetti, 450);
