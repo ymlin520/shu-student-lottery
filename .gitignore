@@ -1,0 +1,16 @@
+# 報名資料（學號、姓名、系所、Email、中獎紀錄）與上傳的圖片，絕對不要上傳到 GitHub
+data/
+*.log
+
+# 後台管理密碼
+admin-password.txt
+
+# SSO 設定：之後會填入世新提供的廠商帳號密碼（id1／id2）
+# 版控裡只放不含帳密的範本 sso-config.example.json
+sso-config.json
+
+# 其他
+node_modules/
+*.tmp
+Thumbs.db
+desktop.ini

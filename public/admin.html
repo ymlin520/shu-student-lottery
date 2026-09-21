@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>在校生抽獎後台</title>
+<link rel="icon" href="/brand/favicon">
+<link rel="stylesheet" href="/assets/theme.css">
+<style>
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px 60px; }
+  .login { max-width: 400px; margin: 12vh auto 0; padding: 32px 28px; }
+  .login h1 { margin: 0 0 20px; font-size: 22px; letter-spacing: .1em; }
+  .tabs { display: flex; gap: 8px; }
+  .tabs button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 8px 18px; font-size: 14px; }
+  .tabs a { border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 8px 18px; font-size: 14px; text-decoration: none; }
+  .tabs a:hover { color: var(--text); }
+  dialog.modal { border: 1px solid var(--line-soft); border-radius: var(--radius); background: #5a0710; color: var(--text); padding: 0; width: min(560px, 94vw); box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  dialog.modal::backdrop { background: rgba(30,0,3,.72); }
+  .modal-head { padding: 22px 26px 6px; }
+  .modal-head h3 { margin: 0 0 4px; font-size: 20px; letter-spacing: .08em; }
+  .modal-body { padding: 10px 26px 4px; max-height: 66vh; overflow-y: auto; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 26px 22px; }
+  .modal-foot .btn-gold { font-size: 16px; letter-spacing: .12em; padding: 12px 26px; }
+  .save-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+  .save-btn { font-size: 16px; letter-spacing: .15em; padding: 12px 26px; }
+  .tabs button.on { color: var(--btn-text); background: linear-gradient(180deg, var(--gold-hi), var(--gold)); border-color: transparent; font-weight: 700; }
+  [hidden] { display: none !important; }
+
+  /* ===== 設定／清單 ===== */
+  .panel { padding: 26px 26px 30px; margin-top: 22px; }
+  #tab-draw > .panel:first-child { margin-top: 0; }
+  .draw-link { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+  .draw-link .btn-gold { font-size: 18px; letter-spacing: .15em; padding: 14px 26px; text-decoration: none; }
+  .panel h3 { margin: 0 0 4px; font-size: 21px; letter-spacing: .1em; font-family: var(--font-display); color: var(--gold-hi); }
+  .panel .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+  .grid3 { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 18px; align-items: end; }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: 14px; border: 1px solid rgba(255,255,255,.1); background: rgba(40,2,6,.4); }
+  .switch input { width: 46px; height: 26px; appearance: none; background: #7a2a30; border-radius: 99px; position: relative; cursor: pointer; transition: background .2s; flex: none; }
+  .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; }
+  .switch input:checked { background: var(--gold); }
+  .switch input:checked::after { left: 23px; }
+  .table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--line-soft); }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 640px; }
+  th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; background: rgba(40,2,6,.45); position: sticky; top: 0; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { color: var(--gold-hi); font-weight: 700; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12.5px; background: rgba(216,172,90,.15); color: var(--gold-hi); }
+  .tag.gray { background: rgba(255,255,255,.07); color: var(--muted); }
+  .muted { color: var(--muted); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .toolbar .input { max-width: 320px; padding: 10px 14px; font-size: 15px; }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat { flex: 1; min-width: 150px; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--line-soft); background: rgba(40,2,6,.35); }
+  .stat b { display: block; font-size: 28px; color: var(--gold-hi); }
+  .stat span { color: var(--muted); font-size: 13px; }
+  .empty { padding: 30px; text-align: center; color: var(--muted); }
+  .link-box { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .link-box code { padding: 8px 12px; border-radius: 10px; background: rgba(40,2,6,.55); border: 1px solid rgba(255,255,255,.1); color: var(--gold-hi); font-size: 14px; word-break: break-all; }
+  @media (max-width: 760px) {
+    .grid3 { grid-template-columns: 1fr; }
+    .panel { padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img class="brand-logo" src="/brand/logo" data-asset="logo" alt="Logo"><span>在校生抽獎後台</span></div>
+  <div id="nav" hidden style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div class="tabs"><button class="on" data-tab="draw">抽獎管理</button><button data-tab="list">名單管理</button><a href="/design" target="_blank">設計 ↗</a></div>
+    <button class="btn-ghost" id="logout">登出</button>
+  </div>
+</header>
+
+<!-- 登入 -->
+<section class="card login" id="loginCard" hidden>
+  <h1>管理後台登入</h1>
+  <div id="loginErr" class="msg err" hidden></div>
+  <form id="loginForm">
+    <div class="field"><label for="pw">管理密碼</label><input class="input" type="password" id="pw" autocomplete="current-password" autofocus></div>
+    <button class="btn-gold" style="width:100%;font-size:18px">登入</button>
+  </form>
+</section>
+
+<main class="wrap" id="app" hidden>
+  <div class="msg err" id="mockBanner" hidden style="margin-bottom:0"></div>
+  <!-- ===== 抽獎 ===== -->
+  <div id="tab-draw">
+    <section class="card panel draw-link">
+      <div>
+        <h3>抽獎畫面</h3>
+        <p class="sub" style="margin:0">投影用的大樂透抽獎頁，用同一組密碼登入。<br><code id="drawUrl" style="color:var(--gold-hi)"></code></p>
+      </div>
+      <a class="btn-gold" href="/draw" target="_blank">開啟抽獎畫面 ↗</a>
+    </section>
+
+    <section class="card panel">
+      <h3>抽獎設定</h3>
+      <p class="sub">修改後按「儲存設定」才會生效，抽獎畫面約 4 秒內同步。每位同學只會中獎一次。</p>
+      <div class="grid3" style="align-items:end">
+        <div class="field" style="margin:0"><label for="prize">本輪獎項<span class="opt">選填</span></label><input class="input" id="prize" maxlength="30" placeholder="留空就不標獎項（例：頭獎、二獎）"></div>
+        <label class="switch"><span>投影時遮蔽姓名中間字</span><input type="checkbox" id="maskName"></label>
+        <label class="switch"><span>開放學生報名</span><input type="checkbox" id="openReg"></label>
+      </div>
+      <div class="save-row">
+        <span class="hint" id="settingsHint"></span>
+        <button class="btn-ghost" id="cancelSettings" hidden>取消變更</button>
+        <button class="btn-gold save-btn" id="saveSettings" disabled>儲存設定</button>
+      </div>
+      <div class="field" style="margin:18px 0 0">
+        <span class="label">學生報名網址（可轉成 QR Code 給學生掃）</span>
+        <div class="link-box"><code id="regUrl"></code><button class="btn-ghost" id="copyUrl">複製</button></div>
+      </div>
+    </section>
+
+    <section class="card panel">
+      <div class="toolbar" style="margin-bottom:6px">
+        <div><h3>中獎紀錄</h3></div>
+        <button class="btn-ghost" id="resetWinners" style="border-color:var(--gold);color:var(--gold-hi)">↻ 重新抽獎（清空中獎紀錄）</button>
+      </div>
+      <p class="sub">抽獎畫面抽出後會自動出現在這裡。撤銷單筆或按「重新抽獎」後，該同學會回到待抽名單，可以重新抽過。</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>獎項</th><th>姓名</th><th>學號</th><th>系所</th><th>班級</th><th>抽出時間</th><th></th></tr></thead>
+        <tbody id="winnerRows"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- ===== 名單 ===== -->
+  <div id="tab-list" hidden>
+    <section class="card panel" style="margin-top:0">
+      <div class="stats">
+        <div class="stat"><b id="sTotal">0</b><span>已報名</span></div>
+        <div class="stat"><b id="sWon">0</b><span>已中獎</span></div>
+        <div class="stat"><b id="sLeft">0</b><span>待抽</span></div>
+        <div class="stat"><b id="sRenamed">0</b><span>後台補登</span></div>
+      </div>
+      <div class="toolbar">
+        <input class="input" id="search" placeholder="搜尋姓名、學號、系所、班級、Email、編號">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-ghost" id="addEntry" style="border-color:var(--gold);color:var(--gold-hi)">＋ 手動新增學生</button>
+          <button class="btn-ghost" id="refresh">重新整理</button>
+          <a class="btn-ghost" href="/api/admin/export.csv" style="text-decoration:none">匯出 CSV（含完整證件號）</a>
+          <button class="btn-ghost btn-danger" id="clearEntries">清空名單</button>
+        </div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>編號</th><th>學號</th><th>姓名</th><th>系所</th><th>班級</th><th>Email</th><th>報名時間</th><th>狀態</th><th></th></tr></thead>
+        <tbody id="entryRows"></tbody>
+      </table></div>
+    </section>
+  </div>
+</main>
+
+<dialog class="modal" id="entryModal">
+  <div class="modal-head">
+    <h3 id="modalTitle">手動新增學生</h3>
+    <p class="sub" id="modalSub" style="margin:0 0 4px">手動補登的學生會和 SSO 登入報名的名單一起參加抽獎。</p>
+  </div>
+  <div class="modal-body">
+    <div id="modalErr" class="msg err" hidden></div>
+    <div class="field"><label for="mStudentNo">學號<span class="req">*</span></label>
+      <input class="input" id="mStudentNo" maxlength="20" placeholder="例：A1100123" style="text-transform:uppercase"></div>
+    <div class="field"><label for="mName">姓名<span class="req">*</span></label>
+      <input class="input" id="mName" maxlength="40" placeholder="請填寫姓名"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label for="mDept">系所<span class="opt">選填</span></label><input class="input" id="mDept" maxlength="60" placeholder="例：新聞學系"></div>
+      <div class="field"><label for="mClassName">班級<span class="opt">選填</span></label><input class="input" id="mClassName" maxlength="40" placeholder="例：四年甲班"></div>
+    </div>
+    <div class="field"><label for="mEmail">Email<span class="opt">選填</span></label>
+      <input class="input" id="mEmail" maxlength="80" placeholder="例：a1100123@mail.shu.edu.tw"></div>
+  </div>
+  <div class="modal-foot">
+    <button type="button" class="btn-ghost" id="modalCancel">取消</button>
+    <button type="button" class="btn-gold" id="modalSave">儲存</button>
+  </div>
+</dialog>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (iso) => new Date(iso).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+let state = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== '/api/admin/login') { showLogin(); throw new Error('未登入'); }
+  if (!r.ok) throw new Error(d.error || '操作失敗');
+  return d;
+}
+function showLogin() { $('#loginCard').hidden = false; $('#app').hidden = true; $('#nav').hidden = true; }
+function maskName(n) {
+  if (!state?.settings.maskName || !/[一-鿿]/.test(n)) return n;
+  const a = [...n];
+  if (a.length <= 1) return n;
+  if (a.length === 2) return a[0] + '○';
+  return a[0] + '○'.repeat(a.length - 2) + a[a.length - 1];
+}
+
+// ---------- 登入 ----------
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('/api/admin/login', { method: 'POST', body: { password: $('#pw').value } }); $('#loginCard').hidden = true; load(); }
+  catch (err) { const b = $('#loginErr'); b.textContent = err.message; b.hidden = false; }
+});
+$('#logout').addEventListener('click', async () => { await api('/api/admin/logout', { method: 'POST' }).catch(() => {}); showLogin(); });
+
+// ---------- 分頁 ----------
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
+  $('#tab-draw').hidden = b.dataset.tab !== 'draw';
+  $('#tab-list').hidden = b.dataset.tab !== 'list';
+  if (b.dataset.tab === 'list') load();
+}));
+
+async function load() {
+  try { state = await api('/api/admin/state'); } catch { return; }
+  $('#app').hidden = false; $('#nav').hidden = false; $('#nav').style.display = 'flex';
+  if (!settingsDirty) fillSettings();
+  $('#regUrl').textContent = location.origin + '/';
+  renderSsoBanner(state.sso || {});
+  $('#drawUrl').textContent = location.origin + '/draw';
+  renderAll();
+}
+function renderSsoBanner(s) {
+  const b = $('#mockBanner');
+  let msg = '';
+  if (s.mock) msg = '⚠️ SSO 目前是<b>測試模式</b>：任何帳號密碼都會通過，學生資料是假的。正式活動前請在 <code>sso-config.json</code> 把 mode 改成 shu 並填入廠商帳密。';
+  else if (!s.ready) msg = '⚠️ <b>' + s.label + '</b>：尚未填入世新提供的廠商帳號密碼（id1／id2），學生目前無法登入。';
+  else if (s.test) msg = '🧪 目前連線：<b>' + s.label + '</b>，只有系統組提供的測試帳號可以登入。正式活動前請把 env 改成 prod。';
+  else msg = '';
+  b.innerHTML = msg;
+  b.hidden = !msg;
+  b.style.background = s.test && !s.mock && s.ready ? 'rgba(216,172,90,.18)' : '';
+  b.style.borderColor = s.test && !s.mock && s.ready ? 'var(--line)' : '';
+  b.style.color = s.test && !s.mock && s.ready ? 'var(--gold-hi)' : '';
+}
+function renderAll() {
+  renderWinners(); renderEntries();
+}
+function renderWinners() {
+  const rows = state.winners.slice().reverse();
+  $('#winnerRows').innerHTML = rows.length ? rows.map((w, i) => `<tr>
+    <td class="num">${rows.length - i}</td><td>${w.prize ? `<span class="tag">${esc(w.prize)}</span>` : '<span class="muted">—</span>'}</td>
+    <td><b>${esc(w.name)}</b></td>
+    <td class="num">${esc(w.studentNo) || '<span class="muted">—</span>'}</td>
+    <td>${esc(w.dept) || '<span class="muted">—</span>'}</td><td>${esc(w.className) || '<span class="muted">—</span>'}</td>
+    <td class="muted">${fmt(w.drawnAt)}</td>
+    <td><button class="btn-ghost btn-danger" data-undo="${w.id}" style="padding:5px 12px">撤銷</button></td></tr>`).join('')
+    : '<tr><td colspan="8" class="empty">還沒有抽出任何人</td></tr>';
+}
+function renderEntries() {
+  const q = $('#search').value.trim().toLowerCase();
+  const list = state.entries.filter((e) => !q || [e.no, e.name, e.studentNo, e.dept, e.className, e.email].join(' ').toLowerCase().includes(q)).reverse();
+  const won = state.entries.filter((e) => e.won).length;
+  $('#sTotal').textContent = state.entries.length; $('#sWon').textContent = won;
+  $('#sLeft').textContent = state.entries.length - won; $('#sRenamed').textContent = state.entries.filter((e) => e.addedBy === 'admin').length;
+  $('#entryRows').innerHTML = list.length ? list.map((e) => `<tr>
+    <td class="num">${esc(e.no)}</td><td class="num">${esc(e.studentNo)}</td><td><b>${esc(e.name)}</b></td>
+    <td>${esc(e.dept) || '<span class="muted">—</span>'}</td><td>${esc(e.className) || '<span class="muted">—</span>'}</td>
+    <td class="muted">${esc(e.email) || '—'}</td><td class="muted">${fmt(e.createdAt)}</td>
+    <td>${e.won ? '<span class="tag">已中獎</span>' : '<span class="tag gray">待抽</span>'}${e.addedBy === 'admin' ? ' <span class="tag gray">後台補登</span>' : ''}</td>
+    <td style="display:flex;gap:6px"><button class="btn-ghost" data-edit="${e.id}" style="padding:5px 12px">編輯</button><button class="btn-ghost btn-danger" data-del="${e.id}" data-name="${esc(e.name)}" style="padding:5px 12px">刪除</button></td></tr>`).join('')
+    : `<tr><td colspan="9" class="empty">${q ? '找不到符合的同學' : '目前還沒有人報名'}</td></tr>`;
+}
+$('#search').addEventListener('input', renderEntries);
+$('#refresh').addEventListener('click', load);
+document.addEventListener('click', async (e) => {
+  const edit = e.target.closest('[data-edit]');
+  if (edit) return openModal(edit.dataset.edit);
+  const undo = e.target.closest('[data-undo]'), del = e.target.closest('[data-del]');
+  if (undo && confirm('確定撤銷這筆中獎紀錄？該同學會回到待抽名單。')) { await api('/api/admin/winners/' + undo.dataset.undo, { method: 'DELETE' }).catch((err) => alert(err.message)); load(); }
+  if (del && confirm(`確定刪除「${del.dataset.name}」的報名資料？此動作無法復原。`)) { await api('/api/admin/entries/' + del.dataset.del, { method: 'DELETE' }).catch((err) => alert(err.message)); load(); }
+});
+$('#resetWinners').addEventListener('click', async () => {
+  if (!state.winners.length) return alert('目前還沒有中獎紀錄。');
+  if (!confirm('重新抽獎會清空全部 ' + state.winners.length + ' 筆中獎紀錄，' + state.entries.length + ' 位同學全部回到待抽名單，可以從頭抽一次。\n\n確定要重新抽獎嗎？')) return;
+  await api('/api/admin/winners/reset', { method: 'POST' }).catch((err) => alert(err.message)); load();
+});
+$('#clearEntries').addEventListener('click', async () => {
+  const n = state.entries.length;
+  if (!n) return alert('名單目前是空的。');
+  if (!confirm('確定清空全部 ' + n + ' 筆報名資料？中獎紀錄也會一併清除。\n此動作無法復原，建議先按「匯出 CSV」備份。')) return;
+  if (!confirm('再確認一次：' + n + ' 筆報名資料將永久刪除。')) return;
+  await api('/api/admin/entries/reset', { method: 'POST' }).catch((err) => alert(err.message)); load();
+});
+
+// ---------- 手動新增／修改單筆 ----------
+const modal = $('#entryModal');
+let editId = null;
+function fillModal(e) {
+  $('#mStudentNo').value = e ? (e.studentNo || '') : '';
+  $('#mName').value = e ? e.name : '';
+  $('#mDept').value = e ? (e.dept || '') : '';
+  $('#mClassName').value = e ? (e.className || '') : '';
+  $('#mEmail').value = e ? (e.email || '') : '';
+  $('#modalErr').hidden = true;
+}
+async function openModal(id) {
+  editId = id || null;
+  $('#modalTitle').textContent = id ? '修改學生資料' : '手動新增學生';
+  $('#modalSub').textContent = id ? '修改後，中獎紀錄與匯出的 CSV 也會一起更新。' : '手動補登的學生會和 SSO 登入報名的名單一起參加抽獎。';
+  if (id) {
+    try { fillModal((await api('/api/admin/entries/' + id)).entry); } catch (err) { return alert(err.message); }
+  } else fillModal(null);
+  modal.showModal();
+  $('#mStudentNo').focus();
+}
+$('#addEntry').addEventListener('click', () => openModal(null));
+$('#modalCancel').addEventListener('click', () => modal.close());
+$('#modalSave').addEventListener('click', async () => {
+  const body = {
+    studentNo: $('#mStudentNo').value.trim().toUpperCase(),
+    name: $('#mName').value.trim(),
+    dept: $('#mDept').value.trim(),
+    className: $('#mClassName').value.trim(),
+    email: $('#mEmail').value.trim(),
+  };
+  const btn = $('#modalSave'); btn.disabled = true; btn.textContent = '儲存中…';
+  try {
+    await api(editId ? '/api/admin/entries/' + editId : '/api/admin/entries', { method: editId ? 'PUT' : 'POST', body });
+    modal.close(); load();
+  } catch (err) {
+    const box = $('#modalErr'); box.textContent = err.message; box.hidden = false;
+  } finally { btn.disabled = false; btn.textContent = '儲存'; }
+});
+// ---------- 抽獎設定：改完按儲存 ----------
+let settingsDirty = false;
+function fillSettings() {
+  $('#prize').value = state.settings.prize || '';
+  $('#maskName').checked = state.settings.maskName;
+  $('#openReg').checked = state.settings.open;
+}
+function markDirty(on) {
+  settingsDirty = on;
+  $('#saveSettings').disabled = !on;
+  $('#cancelSettings').hidden = !on;
+  $('#settingsHint').textContent = on ? '有尚未儲存的變更' : '';
+  $('#settingsHint').style.color = on ? 'var(--gold-hi)' : '';
+}
+['#prize', '#maskName', '#openReg'].forEach((id) => $(id).addEventListener('input', () => markDirty(true)));
+['#maskName', '#openReg'].forEach((id) => $(id).addEventListener('change', () => markDirty(true)));
+$('#cancelSettings').addEventListener('click', () => { fillSettings(); markDirty(false); });
+$('#saveSettings').addEventListener('click', async () => {
+  const btn = $('#saveSettings'); btn.disabled = true; btn.textContent = '儲存中…';
+  try {
+    state.settings = (await api('/api/admin/settings', { method: 'POST', body: { prize: $('#prize').value.trim(), maskName: $('#maskName').checked, open: $('#openReg').checked } })).settings;
+    fillSettings(); markDirty(false);
+    $('#settingsHint').textContent = '✓ 已儲存（' + new Date().toLocaleTimeString('zh-TW', { hour12: false }) + '）';
+    $('#settingsHint').style.color = 'var(--ok)';
+  } catch (err) { alert(err.message); btn.disabled = false; }
+  finally { btn.textContent = '儲存設定'; }
+});
+window.addEventListener('beforeunload', (e) => { if (settingsDirty) e.preventDefault(); });
+$('#copyUrl').addEventListener('click', () => { navigator.clipboard?.writeText($('#regUrl').textContent); $('#copyUrl').textContent = '已複製'; setTimeout(() => $('#copyUrl').textContent = '複製', 1500); });
+// 抽獎畫面抽出的結果自動更新到中獎紀錄
+setInterval(() => { if (!$('#app').hidden && !$('#tab-draw').hidden && document.visibilityState === 'visible') load(); }, 5000);
+
+load();
+</script>
+</body>
+</html>

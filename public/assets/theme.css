@@ -1,0 +1,170 @@
+/* 世新 70 週年在校生版：紅底＋亮金，粗黑體與膠囊按鈕
+   這裡是預設值；/design 設計後台可以覆寫所有 --變數 */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&display=swap');
+
+:root {
+  --bg: #6d0a10;
+  --bg2: #4e0509;
+  --card: rgba(74, 6, 12, 0.62);
+  --line: rgba(232, 190, 110, 0.38);
+  --line-soft: rgba(255, 220, 170, 0.14);
+  --gold: #f2b93b;
+  --gold-hi: #ffe08a;
+  --gold-lo: #9c6a10;
+  --text: #fbeed6;
+  --muted: #e2bba3;
+  --danger: #ffd166;
+  --ok: #b8f0c8;
+  --radius: 26px;
+  --glow1: #c0161f;
+  --glow2: #8f0d14;
+  --btn-text: #7a0c12;
+  --btn-radius: 999px;
+  --input-bg: rgba(40, 2, 6, 0.45);
+  --ring-a: #fff4d2;
+  --ring-b: #f2b93b;
+  --ring-c: #9c6a10;
+  --drum-a: #b3141c;
+  --drum-b: #3e0205;
+  --ball-1: #f2b93b;
+  --ball-2: #5cc8ff;
+  --ball-3: #ff7a8a;
+  --ball-4: #5fd6a7;
+  --ball-5: #b59cff;
+  --tray-ball: #ffd35c;
+  --reg-title-size: clamp(28px, 5vw, 40px);
+  --draw-title-size: clamp(22px, 3vw, 34px);
+  --winner-size: clamp(64px, 10vw, 128px);
+  --dept-size: clamp(22px, 3vw, 36px);
+  --machine-size: min(33vh, 76vw, 440px);
+  --logo-height: 48px;
+  --accent: #4fd1ff;
+  --accent-text: #07233a;
+  --hub-logo-size: 74%;
+  --bg-deco-opacity: 0.9;
+  --font: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif;
+  --font-display: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif;
+  font-family: var(--font);
+}
+[data-t] { white-space: pre-line; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  min-height: 100vh;
+  color: var(--text);
+  background:
+    radial-gradient(900px 560px at 50% 32%, var(--glow1) 0%, transparent 70%),
+    radial-gradient(900px 600px at 100% 100%, var(--glow2) 0%, transparent 65%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+  background-attachment: fixed;
+}
+/* 參考主視覺的背景裝飾：同心金圈、紅綢、金色光帶 */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: var(--bg-deco, url(/brand/bg)) center / cover no-repeat;
+  opacity: var(--bg-deco-opacity, .9);
+}
+body > *:not(dialog) { position: relative; z-index: 1; }
+a { color: var(--gold-hi); }
+button { font: inherit; cursor: pointer; }
+input, select { font: inherit; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  max-width: 1100px; margin: 0 auto; padding: 18px 20px;
+}
+.brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 20px; letter-spacing: .12em; font-family: var(--font-display); }
+.brand-logo[hidden] { display: none; }
+.brand-logo { height: var(--logo-height, 48px); width: auto; filter: drop-shadow(0 3px 6px rgba(0,0,0,.35)); }
+.pill {
+  border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px;
+  color: var(--text); background: rgba(255,240,210,.06); font-size: 14px; text-decoration: none;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 30px 60px rgba(30, 0, 3, .45), inset 0 1px 0 rgba(255, 235, 190, .08);
+  backdrop-filter: blur(8px);
+}
+.btn-gold {
+  border: 0; border-radius: var(--btn-radius); padding: 16px 28px;
+  font-size: 20px; font-weight: 900; letter-spacing: .3em; color: var(--btn-text); font-family: var(--font-display);
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold) 55%, color-mix(in srgb, var(--gold) 80%, black));
+  box-shadow: 0 6px 0 var(--gold-lo), 0 16px 30px rgba(20, 0, 2, .35);
+  transition: transform .08s, box-shadow .08s, filter .2s;
+}
+.btn-gold:hover { filter: brightness(1.05); }
+.btn-gold:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--gold-lo), 0 8px 18px rgba(20, 0, 2, .3); }
+.btn-gold:disabled { filter: grayscale(.5) brightness(.75); cursor: not-allowed; transform: none; }
+.btn-ghost {
+  border: 1px solid var(--line); background: rgba(255, 240, 210, .04); color: var(--text);
+  border-radius: 12px; padding: 9px 16px; font-size: 14px;
+}
+.btn-ghost:hover { background: rgba(255, 220, 150, .12); }
+.btn-danger { border-color: rgba(255, 209, 102, .5); color: var(--danger); }
+
+.field { display: grid; gap: 8px; margin-bottom: 18px; }
+.field label, .label { font-weight: 700; font-size: 15px; }
+.req { color: var(--gold-hi); margin-left: 4px; }
+.opt { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+.input {
+  width: 100%; padding: 14px 16px; border-radius: 12px; font-size: 16px;
+  color: var(--text); background: var(--input-bg);
+  border: 1px solid rgba(255, 220, 170, .22); outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.input::placeholder { color: rgba(251, 238, 214, .42); }
+.input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(216, 172, 90, .25); }
+.input.bad { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(255, 209, 102, .22); }
+.hint { color: var(--muted); font-size: 13px; }
+
+.seg { display: inline-flex; padding: 4px; border-radius: 14px; background: var(--input-bg); border: 1px solid rgba(255, 220, 170, .18); }
+.seg button {
+  border: 0; background: transparent; color: var(--muted); padding: 9px 16px; border-radius: 10px; font-size: 15px;
+}
+.seg button.on { background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: var(--btn-text); font-weight: 700; }
+
+.check { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-size: 15px; }
+.check input { width: 20px; height: 20px; accent-color: var(--gold); }
+
+.msg { border-radius: 12px; padding: 12px 14px; font-size: 14px; margin-bottom: 16px; }
+.msg.err { background: #fff2dc; border: 1px solid var(--gold); color: #8a0c12; font-weight: 600; }
+.msg.ok { background: rgba(184, 240, 200, .12); border: 1px solid rgba(184, 240, 200, .4); color: var(--ok); }
+
+/* ---------- 樂透彩球 ---------- */
+.ball {
+  position: absolute; border-radius: 50%;
+  box-shadow: inset -6px -8px 14px rgba(0,0,0,.3), 0 6px 12px rgba(20,0,2,.45);
+}
+.ball::after {
+  content: ""; position: absolute; left: 18%; top: 12%; width: 38%; height: 30%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255,255,255,.85), rgba(255,255,255,0));
+}
+.c-gold  { background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--ball-1) 22%, white), var(--ball-1) 45%, color-mix(in srgb, var(--ball-1) 45%, black) 100%); }
+.c-teal  { background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--ball-2) 22%, white), var(--ball-2) 45%, color-mix(in srgb, var(--ball-2) 45%, black) 100%); }
+.c-pink  { background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--ball-3) 22%, white), var(--ball-3) 45%, color-mix(in srgb, var(--ball-3) 45%, black) 100%); }
+.c-green { background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--ball-4) 22%, white), var(--ball-4) 45%, color-mix(in srgb, var(--ball-4) 45%, black) 100%); }
+.c-purple{ background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--ball-5) 22%, white), var(--ball-5) 45%, color-mix(in srgb, var(--ball-5) 45%, black) 100%); }
+
+@media (max-width: 640px) {
+  .topbar { padding: 14px 16px; }
+  .brand { font-size: 17px; }
+  .brand-logo { height: calc(var(--logo-height, 48px) * .84); }
+}
+
+/* ---------- 身分識別：校友／在校生一眼可辨 ---------- */
+.id-badge {
+  display: inline-flex; align-items: center; padding: 6px 20px; border-radius: 999px;
+  font-weight: 900; font-size: 15px; letter-spacing: .22em; white-space: nowrap;
+  color: var(--accent-text);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 65%, white), var(--accent));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .3), 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.hero .id-badge { margin-bottom: 16px; font-size: 16px; }
+.watermark {
+  position: fixed !important; z-index: 0 !important; left: 50%; bottom: -2.5vw; transform: translateX(-50%);
+  font-family: var(--font-display); font-weight: 900; font-size: 19vw; line-height: 1; letter-spacing: .04em;
+  white-space: nowrap; color: transparent; pointer-events: none; user-select: none;
+  -webkit-text-stroke: 2px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+@media (max-width: 640px) { .id-badge { font-size: 13px; padding: 5px 14px; letter-spacing: .14em; } .watermark { font-size: 24vw; } }

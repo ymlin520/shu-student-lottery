@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>設計後台</title>
+<link rel="icon" href="/brand/favicon">
+<link rel="stylesheet" href="/assets/theme.css">
+<style>
+  [hidden] { display: none !important; }
+  body { overflow: hidden; }
+  .topbar { max-width: none; padding: 14px 20px; border-bottom: 1px solid var(--line-soft); background: rgba(40,2,6,.5); }
+  .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .actions .btn-gold { font-size: 16px; letter-spacing: .15em; padding: 11px 24px; }
+  .status { font-size: 13px; color: var(--muted); }
+  .status.dirty { color: var(--gold-hi); }
+  .status.ok { color: var(--ok); }
+  .login { max-width: 400px; margin: 12vh auto 0; padding: 32px 28px; }
+  .login h1 { margin: 0 0 20px; font-size: 22px; letter-spacing: .1em; }
+
+  .layout { display: grid; grid-template-columns: 460px 1fr; height: calc(100vh - 75px); }
+  .editor { border-right: 1px solid var(--line-soft); display: flex; flex-direction: column; min-height: 0; background: rgba(40,2,6,.35); }
+  .etabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 14px 16px 10px; border-bottom: 1px solid var(--line-soft); }
+  .etabs button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 6px 13px; font-size: 13.5px; }
+  .etabs button.on { color: var(--btn-text); background: linear-gradient(180deg, var(--gold-hi), var(--gold)); border-color: transparent; font-weight: 700; }
+  .etabs button .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--gold-hi); margin-left: 5px; vertical-align: middle; }
+  .etabs button.on .dot { background: var(--btn-text); }
+  .fields { overflow-y: auto; padding: 14px 16px 40px; flex: 1; }
+  .search { margin-bottom: 12px; padding: 10px 14px; font-size: 14px; }
+  .row { display: grid; grid-template-columns: 150px 1fr 28px; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--line-soft); }
+  .row.wide { grid-template-columns: 1fr 28px; }
+  .row.wide > label { grid-column: 1 / -1; }
+  .row > label { font-size: 13.5px; color: var(--text); line-height: 1.4; }
+  .row > label small { display: block; color: var(--muted); font-size: 11.5px; font-family: ui-monospace, Consolas, monospace; }
+  .row.changed > label { color: var(--gold-hi); }
+  .ctl { display: flex; gap: 8px; align-items: center; min-width: 0; }
+  .ctl .input { padding: 8px 10px; font-size: 13.5px; border-radius: 10px; min-width: 0; }
+  textarea.input { resize: vertical; min-height: 64px; line-height: 1.5; font-family: inherit; }
+  input[type=color] { width: 38px; height: 34px; padding: 0; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: none; cursor: pointer; flex: none; }
+  input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; }
+  input[type=color]::-webkit-color-swatch { border: 0; border-radius: 5px; }
+  .reset { width: 28px; height: 28px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--muted); font-size: 15px; visibility: hidden; }
+  .row.changed .reset { visibility: visible; }
+  .reset:hover { border-color: var(--line); color: var(--gold-hi); }
+  .css-area { width: 100%; min-height: 360px; font-family: ui-monospace, Consolas, monospace; font-size: 13px; line-height: 1.6; tab-size: 2; white-space: pre; }
+  .help { color: var(--muted); font-size: 12.5px; line-height: 1.8; margin: 12px 0 0; }
+  .sec-title { font-size: 13px; color: var(--gold-hi); letter-spacing: .08em; margin: 4px 0 10px; font-weight: 700; }
+  .assets { display: grid; gap: 12px; margin-bottom: 18px; }
+  .asset { display: grid; grid-template-columns: 96px 1fr; gap: 14px; padding: 12px; border: 1px solid var(--line-soft); border-radius: 14px; background: rgba(40,2,6,.3); }
+  .asset.changed { border-color: var(--gold); }
+  .thumb { width: 96px; height: 96px; border-radius: 10px; display: grid; place-items: center; overflow: hidden;
+    background: repeating-conic-gradient(rgba(255,255,255,.08) 0 25%, rgba(0,0,0,.15) 0 50%) 0 0 / 14px 14px; border: 1px solid var(--line-soft); }
+  .thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .thumb.wide img { width: 100%; height: 100%; object-fit: cover; }
+  .thumb .none { color: var(--muted); font-size: 12px; }
+  .asset h4 { margin: 0 0 2px; font-size: 14.5px; }
+  .asset .state { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .asset.changed .state { color: var(--gold-hi); }
+  .asset p { margin: 0 0 8px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .asset .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .asset .btns button { padding: 5px 11px; font-size: 12.5px; border-radius: 9px; }
+  .asset .err { color: var(--danger); font-size: 12px; margin-top: 4px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .preset { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,240,210,.04); color: var(--text); font-size: 13px; }
+  .preset:hover { border-color: var(--gold); }
+  .preset i { width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); }
+  .help code { color: var(--gold-hi); font-size: 12px; }
+
+  .preview { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .ptools { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--line-soft); }
+  .seg button { font-size: 13.5px; padding: 7px 13px; }
+  .frame-wrap { flex: 1; min-height: 0; display: flex; justify-content: center; padding: 16px; background: repeating-conic-gradient(rgba(255,255,255,.025) 0 25%, transparent 0 50%) 0 0 / 24px 24px; }
+  iframe { width: 100%; height: 100%; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--bg); box-shadow: 0 20px 50px rgba(0,0,0,.4); transition: width .25s; }
+  iframe.mobile { width: 390px; }
+  .ptip { color: var(--muted); font-size: 12.5px; }
+
+  @media (max-width: 980px) {
+    body { overflow: auto; }
+    .layout { grid-template-columns: 1fr; height: auto; }
+    .editor { border-right: 0; }
+    .fields { max-height: 60vh; }
+    .frame-wrap { height: 80vh; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img class="brand-logo" src="/brand/logo" data-asset="logo" alt="Logo"><span>設計後台</span></div>
+  <div class="actions" id="actions" hidden>
+    <span class="status" id="status">已是最新</span>
+    <button class="btn-ghost" id="revert" title="放棄還沒儲存的修改">還原成已儲存</button>
+    <button class="btn-ghost btn-danger" id="defaults" title="全部改回系統預設（按儲存後才生效）">全部恢復預設</button>
+    <a class="btn-ghost" href="/admin" style="text-decoration:none">回後台</a>
+    <button class="btn-gold" id="save" disabled>儲存</button>
+  </div>
+</header>
+
+<section class="card login" id="loginCard" hidden>
+  <h1>設計後台登入</h1>
+  <div id="loginErr" class="msg err" hidden></div>
+  <form id="loginForm">
+    <div class="field"><label for="pw">管理密碼</label><input class="input" type="password" id="pw" autocomplete="current-password" autofocus></div>
+    <button class="btn-gold" style="width:100%;font-size:18px">登入</button>
+  </form>
+</section>
+
+<div class="layout" id="app" hidden>
+  <aside class="editor">
+    <nav class="etabs" id="etabs"></nav>
+    <div class="fields" id="fields"></div>
+  </aside>
+  <section class="preview">
+    <div class="ptools">
+      <div class="seg" id="pageSeg">
+        <button class="on" data-page="form">報名頁</button>
+        <button data-page="done">報名完成</button>
+        <button data-page="closed">報名截止</button><button data-page="again">已報名過</button>
+        <button data-page="draw">抽獎頁</button>
+      </div>
+      <span class="ptip" id="ptip">預覽不會送出資料，也不會真的抽獎</span>
+      <div class="seg" id="deviceSeg">
+        <button class="on" data-device="desktop">🖥 電腦</button>
+        <button data-device="mobile">📱 手機</button>
+      </div>
+    </div>
+    <div class="frame-wrap"><iframe id="frame" title="預覽"></iframe></div>
+  </section>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clone = (o) => JSON.parse(JSON.stringify(o));
+let schema, saved, work, defaults;
+let tab = '配色', page = 'form';
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== '/api/admin/login') { showLogin(); throw new Error('未登入'); }
+  if (!r.ok) throw new Error(d.error || '操作失敗');
+  return d;
+}
+function showLogin() { $('#loginCard').hidden = false; $('#app').hidden = true; $('#actions').hidden = true; }
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('/api/admin/login', { method: 'POST', body: { password: $('#pw').value } }); $('#loginCard').hidden = true; load(); }
+  catch (err) { const b = $('#loginErr'); b.textContent = err.message; b.hidden = false; }
+});
+
+async function load() {
+  let d; try { d = await api('/api/admin/design'); } catch { return; }
+  schema = d.schema;
+  defaults = { vars: {}, texts: {}, customCss: '', assets: {} };
+  schema.vars.forEach((v) => defaults.vars[v.key] = v.default);
+  schema.texts.forEach((t) => defaults.texts[t.key] = t.default);
+  saved = clone(d.design); work = clone(d.design);
+  saved.assets = saved.assets || {}; work.assets = work.assets || {};
+  $('#app').hidden = false; $('#actions').hidden = false;
+  renderTabs(); renderFields(); setPage(page); updateStatus();
+}
+
+// ---------- 分頁與欄位 ----------
+function tabList() {
+  const groups = [...new Set(schema.vars.map((v) => v.group))];
+  return [...groups, ...[...new Set(schema.texts.map((t) => t.group))].map((g) => g + '文字'), '進階 CSS'];
+}
+function tabChanged(name) {
+  if (name === '進階 CSS') return work.customCss !== defaults.customCss;
+  if (name.endsWith('文字')) return schema.texts.some((t) => t.group + '文字' === name && work.texts[t.key] !== t.default);
+  if (name === '圖片與 Logo' && Object.keys(work.assets).length) return true;
+  return schema.vars.some((v) => v.group === name && work.vars[v.key] !== v.default);
+}
+function renderTabs() {
+  $('#etabs').innerHTML = tabList().map((n) => `<button class="${n === tab ? 'on' : ''}" data-tab="${esc(n)}">${esc(n)}${tabChanged(n) ? '<span class="dot" title="有修改過"></span>' : ''}</button>`).join('');
+}
+$('#etabs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  tab = b.dataset.tab; renderTabs(); renderFields();
+  // 切到抽獎相關分頁時，預覽自動換成抽獎頁
+  if ((tab === '抽獎機' || tab === '抽獎頁文字') && page !== 'draw') setPage('draw');
+  if (tab === '報名頁文字' && page === 'draw') setPage('form');
+});
+
+// 把任意 CSS 顏色轉成色票能用的 #rrggbb，並記住透明度
+const cv = document.createElement('canvas').getContext('2d');
+function toHex(color) {
+  cv.fillStyle = '#000'; cv.fillStyle = color;
+  const f = cv.fillStyle;
+  if (f.startsWith('#')) return { hex: f, alpha: null };
+  const m = f.match(/rgba?[(]([0-9.]+), *([0-9.]+), *([0-9.]+)(?:, *([0-9.]+))?[)]/);
+  if (!m) return { hex: '#000000', alpha: null };
+  const hex = '#' + [m[1], m[2], m[3]].map((n) => Math.round(+n).toString(16).padStart(2, '0')).join('');
+  return { hex, alpha: m[4] != null ? +m[4] : null };
+}
+function fromHex(hex, alpha) {
+  if (alpha == null) return hex;
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+function renderFields() {
+  const box = $('#fields');
+  if (tab === '進階 CSS') {
+    box.innerHTML = `
+      <textarea class="input css-area" id="customCss" spellcheck="false" placeholder="/* 在這裡寫的 CSS 會套用在登記頁與抽獎頁，優先權最高 */"></textarea>
+      <p class="help">
+        常用選擇器：<code>.hero h1</code> 報名頁標題、<code>.card</code> 卡片、<code>.btn-gold</code> 金色按鈕、<code>.input</code> 輸入框、
+        <code>.stage h2</code> 抽獎頁標題、<code>.ring</code> 抽獎機外環、<code>.drum</code> 球槽、<code>.hub</code> 中心、
+        <code>.tray-ball</code> 中獎球、<code>.result .nm</code> 中獎姓名、<code>.brand</code> 左上角名稱、<code>.brand-logo</code> 左上角 Logo、<code>.hub-logo</code> 抽獎機中心 Logo。<br>
+        也可以覆寫變數，例如 <code>:root { --gold: #c0392b; }</code>。<br>
+        只想改其中一頁，可以用 <code>body:has(.stage)</code>（抽獎頁）或 <code>body:has(.hero)</code>（登記頁）開頭。
+      </p>`;
+    const ta = $('#customCss');
+    ta.value = work.customCss;
+    ta.addEventListener('input', () => { work.customCss = ta.value; changed(); });
+    ta.addEventListener('keydown', (e) => { if (e.key === 'Tab') { e.preventDefault(); const p = ta.selectionStart; ta.setRangeText('  ', p, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input')); } });
+    return;
+  }
+  const isText = tab.endsWith('文字');
+  const items = isText ? schema.texts.filter((t) => t.group + '文字' === tab) : schema.vars.filter((v) => v.group === tab);
+  let extra = '';
+  if (tab === '圖片與 Logo') extra = assetCards();
+  if (tab === '配色') extra = `<div class="sec-title">一鍵套用色系</div><div class="presets">` +
+    Object.entries(PRESETS).map(([name, v]) => `<button class="preset" data-preset="${esc(name)}"><i style="background:linear-gradient(135deg, ${v.glow1} 0 50%, ${v.gold || '#d8ac5a'} 50%)"></i>${esc(name)}</button>`).join('') +
+    `</div><div class="sec-title">個別顏色</div>`;
+  if (tab === '圖片與 Logo') extra += `<div class="sec-title">尺寸與透明度</div>`;
+  box.innerHTML = extra + `<input class="input search" id="fieldSearch" placeholder="搜尋欄位…">` + items.map((it) => {
+    const kind = isText ? 'texts' : 'vars';
+    const val = work[kind][it.key];
+    const wide = isText && it.multiline;
+    let ctl;
+    if (isText) ctl = it.multiline ? `<textarea class="input" data-k="${it.key}" data-kind="texts" rows="3">${esc(val)}</textarea>` : `<input class="input" data-k="${it.key}" data-kind="texts" value="${esc(val)}">`;
+    else if (it.type === 'color') ctl = `<input type="color" data-pick="${it.key}" value="${toHex(val).hex}"><input class="input" data-k="${it.key}" data-kind="vars" value="${esc(val)}">`;
+    else ctl = `<input class="input" data-k="${it.key}" data-kind="vars" value="${esc(val)}">`;
+    const sub = isText ? '' : `<small>--${it.key}</small>`;
+    return `<div class="row ${wide ? 'wide' : ''} ${val !== it.default ? 'changed' : ''}" data-row="${it.key}" data-search="${esc(it.label + ' ' + it.key)}">
+      <label>${esc(it.label)}${sub}</label><div class="ctl">${ctl}</div>
+      <button class="reset" data-reset="${it.key}" data-kind="${kind}" title="恢復預設：${esc(it.default)}">↺</button></div>`;
+  }).join('');
+  $('#fieldSearch').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    box.querySelectorAll('[data-row]').forEach((r) => r.hidden = q && !r.dataset.search.toLowerCase().includes(q));
+  });
+}
+// ---------- 圖片與 Logo ----------
+function assetUrl(slot, v) {
+  if (v === 'none') return '';
+  if (v) return '/uploads/' + encodeURIComponent(v);
+  return '/brand/' + slot + '?default';
+}
+function assetCards() {
+  return `<div class="sec-title">上傳圖片</div><div class="assets">` + schema.assets.map((a) => {
+    const v = work.assets[a.key];
+    const state = v === 'none' ? '目前：不顯示' : v ? '目前：自訂圖片' : '目前：預設圖片';
+    const thumb = v === 'none' ? '<span class="none">不顯示</span>' : `<img src="${assetUrl(a.key, v)}" alt="">`;
+    return `<div class="asset ${v ? 'changed' : ''}" data-asset-card="${a.key}">
+      <div class="thumb ${a.key === 'bg' ? 'wide' : ''}">${thumb}</div>
+      <div>
+        <h4>${esc(a.label)}</h4><div class="state">${state}</div>
+        <p>${esc(a.hint)}</p>
+        <div class="btns">
+          <button class="btn-ghost" data-upload="${a.key}">上傳圖片</button>
+          ${v ? `<button class="btn-ghost" data-asset-reset="${a.key}">恢復預設</button>` : ''}
+          ${a.allowNone && v !== 'none' ? `<button class="btn-ghost" data-asset-none="${a.key}">不顯示</button>` : ''}
+        </div>
+        <input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,image/x-icon,.ico" data-file="${a.key}" hidden>
+        <div class="err" data-asset-err="${a.key}"></div>
+      </div></div>`;
+  }).join('') + `</div>`;
+}
+async function uploadAsset(slot, file) {
+  const errBox = $(`[data-asset-err="${slot}"]`);
+  if (file.size > 5 * 1024 * 1024) { errBox.textContent = '圖片太大，請小於 5 MB。'; return; }
+  errBox.textContent = '上傳中…';
+  try {
+    const r = await fetch('/api/admin/upload?slot=' + slot, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 401) { showLogin(); return; }
+    if (!r.ok) throw new Error(d.error || '上傳失敗');
+    work.assets[slot] = d.file;
+    renderFields(); changed();
+  } catch (err) { errBox.textContent = err.message; }
+}
+$('#fields').addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset.file && t.files[0]) uploadAsset(t.dataset.file, t.files[0]);
+});
+
+// ---------- 一鍵色系 ----------
+const PRESETS = {
+  '紅底亮金（在校生預設）': { bg: '#6d0a10', bg2: '#4e0509', glow1: '#c0161f', glow2: '#8f0d14', card: 'rgba(74, 6, 12, 0.62)', 'btn-text': '#7a0c12', text: '#fbeed6', muted: '#e2bba3', 'input-bg': 'rgba(40, 2, 6, 0.45)', 'drum-a': '#b3141c', 'drum-b': '#3e0205', 'ball-3': '#ff7a8a', gold: '#f2b93b' },
+  '深藍金': { bg: '#0f1d4a', bg2: '#0a1433', glow1: '#2d4fb3', glow2: '#1d3a8a', card: 'rgba(18, 32, 82, 0.62)', 'btn-text': '#8a0c12', text: '#f2f5ff', muted: '#b7c3e6', 'input-bg': 'rgba(6, 12, 40, 0.45)', 'drum-a': '#2a4bb0', 'drum-b': '#08123a', 'ball-3': '#ff7a8a', gold: '#f2b93b' },
+  '紅金（70 週年）': { bg: '#6d0a10', bg2: '#4e0509', glow1: '#c0161f', glow2: '#8f0d14', card: 'rgba(74, 6, 12, 0.62)', 'btn-text': '#7a0c12', text: '#fbeed6', muted: '#e2bba3', 'input-bg': 'rgba(40, 2, 6, 0.45)', 'drum-a': '#b3141c', 'drum-b': '#3e0205', 'ball-3': '#e0303a' },
+  '藍金': { bg: '#0b1730', bg2: '#081226', glow1: '#1f3b6d', glow2: '#16305a', card: 'rgba(18, 36, 68, 0.72)', 'btn-text': '#3b2503', text: '#f3f1ea', muted: '#a9b4c9', 'input-bg': 'rgba(5, 14, 32, 0.55)', 'drum-a': '#1d3a66', 'drum-b': '#081328', 'ball-3': '#52b8d6' },
+  '墨綠金': { bg: '#0d3b2e', bg2: '#072a20', glow1: '#1b6b50', glow2: '#124a38', card: 'rgba(8, 48, 36, 0.66)', 'btn-text': '#0f3a2c', text: '#f4efe0', muted: '#b9d2c5', 'input-bg': 'rgba(2, 24, 18, 0.45)', 'drum-a': '#1b6b50', 'drum-b': '#03201a', 'ball-3': '#3fa37a' },
+  '紫金': { bg: '#3b1454', bg2: '#250b37', glow1: '#6a2c91', glow2: '#4a1d68', card: 'rgba(44, 12, 66, 0.64)', 'btn-text': '#3b1454', text: '#f7eefc', muted: '#cdb6de', 'input-bg': 'rgba(20, 4, 32, 0.45)', 'drum-a': '#6a2c91', 'drum-b': '#1d0630', 'ball-3': '#a66fd1' },
+  '黑金': { bg: '#161310', bg2: '#0a0908', glow1: '#3a2f1c', glow2: '#2a2215', card: 'rgba(28, 24, 18, 0.72)', 'btn-text': '#2a1d05', text: '#f5ecd8', muted: '#bfb39c', 'input-bg': 'rgba(0, 0, 0, 0.4)', 'drum-a': '#3a2f1c', 'drum-b': '#0a0806', 'ball-3': '#8a6a3a' },
+};
+
+$('#fields').addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.dataset.pick) {
+    const k = t.dataset.pick, alpha = toHex(work.vars[k]).alpha;
+    work.vars[k] = fromHex(t.value, alpha);
+    $(`[data-k="${k}"]`).value = work.vars[k];
+    rowState(k, 'vars'); return changed();
+  }
+  if (t.dataset.k) {
+    work[t.dataset.kind][t.dataset.k] = t.value;
+    if (t.dataset.kind === 'vars') { const p = $(`[data-pick="${t.dataset.k}"]`); if (p) p.value = toHex(t.value).hex; }
+    rowState(t.dataset.k, t.dataset.kind); changed();
+  }
+});
+$('#fields').addEventListener('click', (e) => {
+  const up = e.target.closest('[data-upload]');
+  if (up) return $(`[data-file="${up.dataset.upload}"]`).click();
+  const ar = e.target.closest('[data-asset-reset]');
+  if (ar) { delete work.assets[ar.dataset.assetReset]; renderFields(); return changed(); }
+  const an = e.target.closest('[data-asset-none]');
+  if (an) { work.assets[an.dataset.assetNone] = 'none'; renderFields(); return changed(); }
+  const pr = e.target.closest('[data-preset]');
+  if (pr) { Object.assign(work.vars, PRESETS[pr.dataset.preset]); renderFields(); return changed(); }
+  const b = e.target.closest('[data-reset]'); if (!b) return;
+  const k = b.dataset.reset, kind = b.dataset.kind;
+  work[kind][k] = defaults[kind][k];
+  const el = $(`[data-k="${k}"]`); el.value = work[kind][k];
+  const p = $(`[data-pick="${k}"]`); if (p) p.value = toHex(work[kind][k]).hex;
+  rowState(k, kind); changed();
+});
+function rowState(k, kind) { const r = $(`[data-row="${k}"]`); if (r) r.classList.toggle('changed', work[kind][k] !== defaults[kind][k]); }
+
+// ---------- 狀態、儲存 ----------
+const isDirty = () => JSON.stringify(work) !== JSON.stringify(saved);
+function updateStatus(msg) {
+  const s = $('#status'), dirty = isDirty();
+  $('#save').disabled = !dirty;
+  $('#revert').disabled = !dirty;
+  s.className = 'status ' + (msg ? 'ok' : dirty ? 'dirty' : '');
+  s.textContent = msg || (dirty ? '● 有尚未儲存的修改' : '已是最新');
+}
+let pushTimer;
+function changed() {
+  updateStatus(); renderTabsDots();
+  clearTimeout(pushTimer); pushTimer = setTimeout(push, 80);
+}
+function renderTabsDots() { const cur = tab; renderTabs(); tab = cur; }
+$('#save').addEventListener('click', async () => {
+  const b = $('#save'); b.disabled = true; b.textContent = '儲存中…';
+  try {
+    const d = await api('/api/admin/design', { method: 'POST', body: work });
+    saved = clone(d.design); work = clone(d.design);
+    renderFields(); renderTabs(); push();
+    updateStatus('✓ 已儲存，前台重新整理即可看到（' + new Date().toLocaleTimeString('zh-TW', { hour12: false }) + '）');
+  } catch (err) { alert(err.message); updateStatus(); }
+  finally { b.textContent = '儲存'; }
+});
+$('#revert').addEventListener('click', () => { if (!confirm('放棄所有還沒儲存的修改？')) return; work = clone(saved); renderFields(); changed(); });
+$('#defaults').addEventListener('click', () => {
+  if (!confirm('把所有顏色、尺寸、文字和進階 CSS 改回系統預設？\n（按「儲存」之後才會套用到前台）')) return;
+  work = clone(defaults); renderFields(); changed();
+});
+window.addEventListener('beforeunload', (e) => { if (work && isDirty()) e.preventDefault(); });
+document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (!$('#save').disabled) $('#save').click(); } });
+
+// ---------- 預覽 ----------
+const frame = $('#frame');
+function setPage(p) {
+  const prevDraw = page === 'draw', nowDraw = p === 'draw';
+  page = p;
+  document.querySelectorAll('#pageSeg button').forEach((b) => b.classList.toggle('on', b.dataset.page === p));
+  $('#ptip').textContent = nowDraw ? '可以按預覽裡的「開始抽獎」試看動畫（不會真的抽）' : '預覽不會送出資料，也不會真的抽獎';
+  const want = nowDraw ? '/draw?preview' : '/?preview';
+  if (!frame.src.endsWith(want) || prevDraw !== nowDraw) frame.src = want;
+  else pushView();
+}
+function push() { frame.contentWindow?.postMessage({ type: 'design', design: work }, location.origin); }
+function pushView() { if (page !== 'draw') frame.contentWindow?.postMessage({ type: 'view', view: page }, location.origin); }
+window.addEventListener('message', (e) => {
+  if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
+  if (e.data?.type === 'preview-ready') { push(); pushView(); }
+});
+$('#pageSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-page]'); if (b) setPage(b.dataset.page); });
+$('#deviceSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-device]'); if (!b) return;
+  document.querySelectorAll('#deviceSeg button').forEach((x) => x.classList.toggle('on', x === b));
+  frame.classList.toggle('mobile', b.dataset.device === 'mobile');
+});
+
+load();
+</script>
+</body>
+</html>
