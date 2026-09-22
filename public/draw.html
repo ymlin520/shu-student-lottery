@@ -254,8 +254,14 @@ function buildBalls(remaining) {
   while (balls.length > n) balls.pop().el.remove();
   while (balls.length < n) balls.push(makeBall(!initial)); // 補的球從上方掉進來
 }
+let lastD = 0;
 function step() {
   const { D, R, r, hub } = dims();
+  if (lastD && D && D !== lastD) { // 設計後台調整抽獎機大小時，球跟著等比例縮放
+    const k = D / lastD;
+    for (const b of balls) { b.x *= k; b.y *= k; b.el.style.width = b.el.style.height = r * 2 + 'px'; }
+  }
+  if (D) lastD = D;
   const live = balls.filter((b) => !b.picked);
   const g = D * 0.0011, limit = R * 0.93 - r, e = mixing ? 0.9 : 0.45;
   const dt = mixing ? simDt : 1; // 攪拌時慢動作：同樣的翻滾軌跡，只是放慢

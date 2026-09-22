@@ -36,7 +36,8 @@
   --draw-title-size: clamp(22px, 3vw, 34px);
   --winner-size: clamp(110px, 17vw, 260px);
   --dept-size: clamp(30px, 4vw, 56px);
-  --machine-size: min(33vh, 76vw, 440px);
+  --machine-vh: 56;
+  --machine-size: min(calc(var(--machine-vh, 56) * 1vh), 82vw, 760px);
   --logo-height: 48px;
   --mix-speed: 0.3;
   --ball-count: 32;

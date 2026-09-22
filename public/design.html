@@ -39,6 +39,8 @@
   input[type=color] { width: 38px; height: 34px; padding: 0; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: none; cursor: pointer; flex: none; }
   input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; }
   input[type=color]::-webkit-color-swatch { border: 0; border-radius: 5px; }
+  .slider { flex: 1; accent-color: var(--gold); min-width: 0; }
+  .rv { min-width: 44px; text-align: right; font-size: 13px; color: var(--gold-hi); font-variant-numeric: tabular-nums; }
   .reset { width: 28px; height: 28px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--muted); font-size: 15px; visibility: hidden; }
   .row.changed .reset { visibility: visible; }
   .reset:hover { border-color: var(--line); color: var(--gold-hi); }
@@ -233,6 +235,7 @@ function renderFields() {
     let ctl;
     if (isText) ctl = it.multiline ? `<textarea class="input" data-k="${it.key}" data-kind="texts" rows="3">${esc(val)}</textarea>` : `<input class="input" data-k="${it.key}" data-kind="texts" value="${esc(val)}">`;
     else if (it.type === 'color') ctl = `<input type="color" data-pick="${it.key}" value="${toHex(val).hex}"><input class="input" data-k="${it.key}" data-kind="vars" value="${esc(val)}">`;
+    else if (it.type === 'range') ctl = `<input type="range" class="slider" data-k="${it.key}" data-kind="vars" min="${it.min}" max="${it.max}" step="${it.step}" value="${esc(val)}"><output class="rv" data-rv="${it.key}">${esc(val)}</output>`;
     else ctl = `<input class="input" data-k="${it.key}" data-kind="vars" value="${esc(val)}">`;
     const sub = isText ? '' : `<small>--${it.key}</small>`;
     return `<div class="row ${wide ? 'wide' : ''} ${val !== it.default ? 'changed' : ''}" data-row="${it.key}" data-search="${esc(it.label + ' ' + it.key)}">
@@ -309,6 +312,9 @@ $('#fields').addEventListener('input', (e) => {
   }
   if (t.dataset.k) {
     work[t.dataset.kind][t.dataset.k] = t.value;
+    const rv = $(`[data-rv="${t.dataset.k}"]`); if (rv) rv.textContent = t.value;
+    // 調抽獎機大小或彩球時，預覽切回抽獎頁才看得清楚
+    if (/^(machine-|ball-)/.test(t.dataset.k) && page === 'drawReveal') setPage('draw');
     if (t.dataset.kind === 'vars') { const p = $(`[data-pick="${t.dataset.k}"]`); if (p) p.value = toHex(t.value).hex; }
     rowState(t.dataset.k, t.dataset.kind); changed();
   }
@@ -326,6 +332,7 @@ $('#fields').addEventListener('click', (e) => {
   const k = b.dataset.reset, kind = b.dataset.kind;
   work[kind][k] = defaults[kind][k];
   const el = $(`[data-k="${k}"]`); el.value = work[kind][k];
+  const rv = $(`[data-rv="${k}"]`); if (rv) rv.textContent = work[kind][k];
   const p = $(`[data-pick="${k}"]`); if (p) p.value = toHex(work[kind][k]).hex;
   rowState(k, kind); changed();
 });
