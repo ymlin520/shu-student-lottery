@@ -1,5 +1,5 @@
 {
-  "_說明": "mode 可填 shu（世新 SSO）、mock（測試模式，任何帳密都會通過）、api（其他自訂 JSON API）。拿到世新系統組發的廠商帳號密碼後，把 id1、id2 填好，再把 mode 改成 shu，然後重新啟動程式。",
+  "_說明": "mode 填 shu（世新 SSO）、mock（測試模式）或 api。世新 SSO 的廠商帳密填在 shu.accounts.test／shu.accounts.prod，env 填 test 或 prod 決定連哪一台。改完要重新啟動程式。",
   "mode": "mock",
   "shu": {
     "_說明": "世新 SSO Web Service：ServSSO.asmx 的 SetUrlLog。env 填 test 走測試機、prod 走正式機。",
@@ -15,7 +15,18 @@
     "_id1說明": "世新提供的廠商帳號（12 碼），不是學生帳號",
     "_id2說明": "世新提供的廠商密碼（12 碼）",
     "_onlyCurrentStudent說明": "true = 只有在校生可以報名（回傳欄位第 7 欄＝1）；false = 教職員、校友也可報名",
-    "_測試帳號": "文件提供：A00000001/1000（在校生）、A00000002/2000（離校生）、A00000003/39988（教職員且在校生）"
+    "_測試帳號": "文件提供：A00000001/1000（在校生）、A00000002/2000（離校生）、A00000003/39988（教職員且在校生）",
+    "_accounts說明": "廠商帳密：測試機填 accounts.test、正式機填 accounts.prod；env 決定用哪一組",
+    "accounts": {
+      "test": {
+        "id1": "",
+        "id2": ""
+      },
+      "prod": {
+        "id1": "",
+        "id2": ""
+      }
+    }
   },
   "api": {
     "url": "",

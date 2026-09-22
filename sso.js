@@ -34,12 +34,20 @@ function unescapeXml(s) {
     .replace(/&apos;/g, "'").replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n)).replace(/&amp;/g, '&');
 }
 
+// 廠商帳密：測試機、正式機各一組放在 accounts.test／accounts.prod；沒有就用 shu.id1／id2
+function vendorCreds(c) {
+  const env = c.env === 'prod' ? 'prod' : 'test';
+  const k = (c.accounts && c.accounts[env]) || {};
+  return { id1: k.id1 || c.id1 || '', id2: k.id2 || c.id2 || '' };
+}
+
 async function shuVerify(account, password, cfg) {
   const c = cfg.shu || {};
   const url = (c.url || (c.env === 'prod' ? SHU_PROD_URL : SHU_TEST_URL)).replace(/\/+$/, '');
-  if (!c.id1 || !c.id2) return { ok: false, error: '尚未設定世新提供的廠商帳號密碼，請聯絡管理員。', detail: 'missing id1/id2' };
+  const { id1, id2 } = vendorCreds(c);
+  if (!id1 || !id2) return { ok: false, error: '尚未設定世新提供的廠商帳號密碼，請聯絡管理員。', detail: 'missing id1/id2' };
 
-  const body = new URLSearchParams({ id1: c.id1, id2: c.id2, ip: '', sLog: account, sUrl: password });
+  const body = new URLSearchParams({ id1, id2, ip: '', sLog: account, sUrl: password });
   let text;
   try {
     const res = await fetch(url + '/SetUrlLog', {
@@ -180,7 +188,7 @@ function status() {
       mode: 'shu',
       label: '世新 SSO（' + (prod ? '正式機' : '測試機') + '）',
       url: c.url || (prod ? SHU_PROD_URL : SHU_TEST_URL),
-      ready: !!(c.id1 && c.id2),
+      ready: (() => { const k = vendorCreds(c); return !!(k.id1 && k.id2); })(),
       test: !prod,
     };
   }
