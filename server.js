@@ -421,11 +421,11 @@ async function handle(req, res) {
     if (m === 'GET' && p === '/api/admin/export.csv') {
       const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
       const winMap = new Map(db.winners.map((w) => [w.entryId, w]));
-      const rows = [['報名編號', '學號', '姓名', '系所', '班級', 'Email', '來源', '報名時間', '最後登入', '中獎獎項', '抽出時間']];
+      const rows = [['報名編號', '學號', '姓名', '系所', 'Email', '來源', '報名時間', '最後登入', '中獎獎項', '抽出時間']];
       for (const e of db.entries) {
         const w = winMap.get(e.id);
         const tw = (t) => t ? new Date(t).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '';
-        rows.push([e.no, e.studentNo, e.name, e.dept, e.className, e.email, e.addedBy === 'admin' ? '後台補登' : 'SSO 登入',
+        rows.push([e.no, e.studentNo, e.name, e.dept, e.email, e.addedBy === 'admin' ? '後台補登' : 'SSO 登入',
           tw(e.createdAt), tw(e.lastLoginAt), w ? w.prize : '', w ? tw(w.drawnAt) : '']);
       }
       const csv = '﻿' + rows.map((r) => r.map(q).join(',')).join('\r\n');

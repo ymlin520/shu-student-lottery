@@ -120,7 +120,7 @@
       </div>
       <p class="sub">抽獎畫面抽出後會自動出現在這裡。撤銷單筆或按「重新抽獎」後，該同學會回到待抽名單，可以重新抽過。</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>獎項</th><th>姓名</th><th>學號</th><th>系所</th><th>班級</th><th>抽出時間</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>獎項</th><th>姓名</th><th>學號</th><th>系所</th><th>抽出時間</th><th></th></tr></thead>
         <tbody id="winnerRows"></tbody>
       </table></div>
     </section>
@@ -136,7 +136,7 @@
         <div class="stat"><b id="sRenamed">0</b><span>後台補登</span></div>
       </div>
       <div class="toolbar">
-        <input class="input" id="search" placeholder="搜尋姓名、學號、系所、班級、Email、編號">
+        <input class="input" id="search" placeholder="搜尋姓名、學號、系所、Email、編號">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-ghost" id="addEntry" style="border-color:var(--gold);color:var(--gold-hi)">＋ 手動新增學生</button>
           <button class="btn-ghost" id="refresh">重新整理</button>
@@ -145,7 +145,7 @@
         </div>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>編號</th><th>學號</th><th>姓名</th><th>系所</th><th>班級</th><th>Email</th><th>報名時間</th><th>狀態</th><th></th></tr></thead>
+        <thead><tr><th>編號</th><th>學號</th><th>姓名</th><th>系所</th><th>Email</th><th>報名時間</th><th>狀態</th><th></th></tr></thead>
         <tbody id="entryRows"></tbody>
       </table></div>
     </section>
@@ -165,7 +165,6 @@
       <input class="input" id="mName" maxlength="40" placeholder="請填寫姓名"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div class="field"><label for="mDept">系所<span class="opt">選填</span></label><input class="input" id="mDept" maxlength="60" placeholder="例：新聞學系"></div>
-      <div class="field"><label for="mClassName">班級<span class="opt">選填</span></label><input class="input" id="mClassName" maxlength="40" placeholder="例：四年甲班"></div>
     </div>
     <div class="field"><label for="mEmail">Email<span class="opt">選填</span></label>
       <input class="input" id="mEmail" maxlength="80" placeholder="例：a1100123@mail.shu.edu.tw"></div>
@@ -245,20 +244,20 @@ function renderWinners() {
     <td class="num">${rows.length - i}</td><td>${w.prize ? `<span class="tag">${esc(w.prize)}</span>` : '<span class="muted">—</span>'}</td>
     <td><b>${esc(w.name)}</b></td>
     <td class="num">${esc(w.studentNo) || '<span class="muted">—</span>'}</td>
-    <td>${esc(w.dept) || '<span class="muted">—</span>'}</td><td>${esc(w.className) || '<span class="muted">—</span>'}</td>
+    <td>${esc(w.dept) || '<span class="muted">—</span>'}</td>
     <td class="muted">${fmt(w.drawnAt)}</td>
     <td><button class="btn-ghost btn-danger" data-undo="${w.id}" style="padding:5px 12px">撤銷</button></td></tr>`).join('')
     : '<tr><td colspan="8" class="empty">還沒有抽出任何人</td></tr>';
 }
 function renderEntries() {
   const q = $('#search').value.trim().toLowerCase();
-  const list = state.entries.filter((e) => !q || [e.no, e.name, e.studentNo, e.dept, e.className, e.email].join(' ').toLowerCase().includes(q)).reverse();
+  const list = state.entries.filter((e) => !q || [e.no, e.name, e.studentNo, e.dept, e.email].join(' ').toLowerCase().includes(q)).reverse();
   const won = state.entries.filter((e) => e.won).length;
   $('#sTotal').textContent = state.entries.length; $('#sWon').textContent = won;
   $('#sLeft').textContent = state.entries.length - won; $('#sRenamed').textContent = state.entries.filter((e) => e.addedBy === 'admin').length;
   $('#entryRows').innerHTML = list.length ? list.map((e) => `<tr>
     <td class="num">${esc(e.no)}</td><td class="num">${esc(e.studentNo)}</td><td><b>${esc(e.name)}</b></td>
-    <td>${esc(e.dept) || '<span class="muted">—</span>'}</td><td>${esc(e.className) || '<span class="muted">—</span>'}</td>
+    <td>${esc(e.dept) || '<span class="muted">—</span>'}</td>
     <td class="muted">${esc(e.email) || '—'}</td><td class="muted">${fmt(e.createdAt)}</td>
     <td>${e.won ? '<span class="tag">已中獎</span>' : '<span class="tag gray">待抽</span>'}${e.addedBy === 'admin' ? ' <span class="tag gray">後台補登</span>' : ''}</td>
     <td style="display:flex;gap:6px"><button class="btn-ghost" data-edit="${e.id}" style="padding:5px 12px">編輯</button><button class="btn-ghost btn-danger" data-del="${e.id}" data-name="${esc(e.name)}" style="padding:5px 12px">刪除</button></td></tr>`).join('')
@@ -293,7 +292,6 @@ function fillModal(e) {
   $('#mStudentNo').value = e ? (e.studentNo || '') : '';
   $('#mName').value = e ? e.name : '';
   $('#mDept').value = e ? (e.dept || '') : '';
-  $('#mClassName').value = e ? (e.className || '') : '';
   $('#mEmail').value = e ? (e.email || '') : '';
   $('#modalErr').hidden = true;
 }
@@ -314,7 +312,6 @@ $('#modalSave').addEventListener('click', async () => {
     studentNo: $('#mStudentNo').value.trim().toUpperCase(),
     name: $('#mName').value.trim(),
     dept: $('#mDept').value.trim(),
-    className: $('#mClassName').value.trim(),
     email: $('#mEmail').value.trim(),
   };
   const btn = $('#modalSave'); btn.disabled = true; btn.textContent = '儲存中…';

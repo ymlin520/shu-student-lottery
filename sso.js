@@ -106,7 +106,6 @@ function mockVerify(account) {
       studentNo: account.toUpperCase(),
       name: '測試學生' + tail,
       dept: depts[Number(tail) % depts.length],
-      className: '四年甲班',
       email: account.toLowerCase() + '@mail.shu.edu.tw',
       raw: { mock: true },
     },
