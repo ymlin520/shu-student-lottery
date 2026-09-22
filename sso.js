@@ -46,7 +46,7 @@ async function shuVerify(account, password, cfg) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8', Accept: 'text/xml' },
       body: body.toString(),
-      signal: AbortSignal.timeout(c.timeoutMs || 10000),
+      signal: AbortSignal.timeout(c.timeoutMs || 15000),
     });
     const xml = await res.text();
     if (!res.ok) return { ok: false, error: '系統登入失敗，請稍後再試。', detail: 'HTTP ' + res.status };
@@ -58,6 +58,9 @@ async function shuVerify(account, password, cfg) {
 
   if (!text) return { ok: false, error: '系統登入失敗，請稍後再試。', detail: '空回應' };
   if (/^Error\s*[:：]/i.test(text)) {
+    // 世新回傳的錯誤訊息會附上使用者輸入的密碼原文，寫進 log 前一律遮掉
+    text = text.replace(/密碼\s*[:：]\s*『[^』]*』/g, '密碼:『***』');
+    if (password) text = text.split(password).join('***');
     // 『Error:』後面的訊息是給開發除錯用，不直接顯示給學生
     if (/廠商/.test(text)) return { ok: false, error: '系統設定有誤（廠商驗證未通過），請聯絡管理員。', detail: text, vendorError: true };
     return { ok: false, error: '系統登入失敗！請確認帳號與密碼。', detail: text };
