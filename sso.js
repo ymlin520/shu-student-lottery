@@ -69,13 +69,18 @@ async function shuVerify(account, password, cfg) {
   const f = text.split(',').map((v) => v.trim());
   if (f.length < 15) return { ok: false, error: '系統登入失敗，請稍後再試。', detail: '欄位數不符：' + f.length };
 
-  const isStudent = f[6] === '1';           // 在校生
-  const isStaff = f[5] === '1';             // 現職教職員
-  if (c.onlyCurrentStudent !== false && !isStudent) {
-    return { ok: false, error: '本次抽獎限在校生參加，你的帳號不是在校生身分。', detail: `在校生=${f[6]} 教職員=${f[5]}` };
+  // 判斷在校生：第 13 欄「登入身分」＝ 2（學生）且第 7 欄「是否為在校生」＝ 1，兩者都要成立
+  const loginAsStudent = f[12] === '2';     // 第 13 欄：登入身分（1 教職員、2 學生）
+  const isStudent = f[6] === '1';           // 第 7 欄：是否為在校生
+  const isStaff = f[5] === '1';             // 第 6 欄：是否為現職員工
+  if (c.onlyCurrentStudent !== false && !(loginAsStudent && isStudent)) {
+    // 以教職員身分登入但有在校學號的人，提示改用學號；其他人一律說明不是在校生
+    const why = !loginAsStudent && isStudent && f[4] ? '請改用學號登入（目前是以教職員編號登入）。' : '你的帳號不是在校生身分。';
+    return { ok: false, error: '本次抽獎限在校生參加，' + why, detail: `登入身分=${f[12]} 在校生=${f[6]} 教職員=${f[5]}` };
   }
 
-  const studentNo = (f[4] || f[13] || account).toUpperCase();
+  // 學號取第 14 欄「登入員工編號或學號」（登入身分為學生時就是學號）
+  const studentNo = (f[13] || account).toUpperCase();
   const emailAcct = f[14] || '';
   return {
     ok: true,
