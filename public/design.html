@@ -93,12 +93,14 @@
     <button class="btn-ghost" id="revert" title="放棄還沒儲存的修改">還原成已儲存</button>
     <button class="btn-ghost btn-danger" id="defaults" title="全部改回系統預設（按儲存後才生效）">全部恢復預設</button>
     <a class="btn-ghost" href="/admin" style="text-decoration:none">回後台</a>
+    <button class="btn-ghost" id="logoutBtn" title="登出設計後台">登出</button>
     <button class="btn-gold" id="save" disabled>儲存</button>
   </div>
 </header>
 
 <section class="card login" id="loginCard" hidden>
   <h1>設計後台登入</h1>
+  <p class="hint" id="loginHint" style="margin:-10px 0 16px">設計後台需要單獨登入，登入 2 小時後會自動登出。</p>
   <div id="loginErr" class="msg err" hidden></div>
   <form id="loginForm">
     <div class="field"><label for="pw">管理密碼</label><input class="input" type="password" id="pw" autocomplete="current-password" autofocus></div>
@@ -143,10 +145,13 @@ async function api(path, opts = {}) {
   if (!r.ok) throw new Error(d.error || '操作失敗');
   return d;
 }
-function showLogin() { $('#loginCard').hidden = false; $('#app').hidden = true; $('#actions').hidden = true; }
+function showLogin() {
+  if (work && saved && isDirty()) $('#loginHint').textContent = '登入已逾時，請重新登入；尚未儲存的修改會保留。';
+  $('#loginCard').hidden = false; $('#app').hidden = true; $('#actions').hidden = true;
+}
 $('#loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  try { await api('/api/admin/login', { method: 'POST', body: { password: $('#pw').value } }); $('#loginCard').hidden = true; load(); }
+  try { await api('/api/admin/login', { method: 'POST', body: { password: $('#pw').value, scope: 'design' } }); $('#pw').value = ''; $('#loginErr').hidden = true; $('#loginCard').hidden = true; load(); }
   catch (err) { const b = $('#loginErr'); b.textContent = err.message; b.hidden = false; }
 });
 
@@ -156,7 +161,8 @@ async function load() {
   defaults = { vars: {}, texts: {}, customCss: '', assets: {} };
   schema.vars.forEach((v) => defaults.vars[v.key] = v.default);
   schema.texts.forEach((t) => defaults.texts[t.key] = t.default);
-  saved = clone(d.design); work = clone(d.design);
+  const keep = work && saved && isDirty() ? work : null; // 逾時重新登入時保留還沒儲存的修改
+  saved = clone(d.design); work = keep || clone(d.design);
   saved.assets = saved.assets || {}; work.assets = work.assets || {};
   $('#app').hidden = false; $('#actions').hidden = false;
   renderTabs(); renderFields(); setPage(page); updateStatus();
@@ -367,6 +373,13 @@ $('#revert').addEventListener('click', () => { if (!confirm('放棄所有還沒�
 $('#defaults').addEventListener('click', () => {
   if (!confirm('把所有顏色、尺寸、文字和進階 CSS 改回系統預設？\n（按「儲存」之後才會套用到前台）')) return;
   work = clone(defaults); renderFields(); changed();
+});
+$('#logoutBtn').addEventListener('click', async () => {
+  if (work && isDirty() && !confirm('還有尚未儲存的修改，確定要登出嗎？')) return;
+  await fetch('/api/admin/design-logout', { method: 'POST' }).catch(() => {});
+  work = null; saved = null;
+  $('#loginHint').textContent = '已登出。設計後台需要單獨登入，登入 2 小時後會自動登出。';
+  showLogin();
 });
 window.addEventListener('beforeunload', (e) => { if (work && isDirty()) e.preventDefault(); });
 document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (!$('#save').disabled) $('#save').click(); } });

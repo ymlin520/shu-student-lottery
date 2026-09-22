@@ -77,6 +77,16 @@ function isAdmin(req) {
   sessions.set(t, Date.now() + 12 * 3600_000);
   return true;
 }
+// 設計後台獨立登入：就算已登入後台，進 /design 也要再輸入密碼；2 小時後失效，不會自動延長
+const designSessions = new Map(); // token -> 到期時間
+const DESIGN_TTL = 2 * 3600_000;
+function isDesigner(req) {
+  const t = cookie(req, 'dsid');
+  const exp = t && designSessions.get(t);
+  if (!exp || exp < Date.now()) { if (t) designSessions.delete(t); return false; }
+  return true;
+}
+const DESIGN_APIS = new Set(['/api/admin/design', '/api/admin/upload', '/api/admin/design-logout']);
 const clientIp = (req) => req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '';
 
 const publicEntry = (e, winnerSet) => ({
@@ -291,11 +301,17 @@ async function handle(req, res) {
     const a = Buffer.from(String(b.password || '')), c = Buffer.from(ADMIN_PASSWORD);
     if (a.length !== c.length || !crypto.timingSafeEqual(a, c)) return send(res, 401, { error: '密碼錯誤' });
     const t = crypto.randomBytes(24).toString('hex');
+    if (b.scope === 'design') { // 設計後台用自己的登入
+      designSessions.set(t, Date.now() + DESIGN_TTL);
+      return send(res, 200, { ok: true }, { 'Set-Cookie': `dsid=${t}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${DESIGN_TTL / 1000}` });
+    }
     sessions.set(t, Date.now() + 12 * 3600_000);
     return send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${t}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200` });
   }
   if (p.startsWith('/api/admin/')) {
-    if (!isAdmin(req)) return send(res, 401, { error: '請先登入' });
+    // 設計相關 API 只認設計後台的登入；其他後台 API 只認後台登入
+    if (DESIGN_APIS.has(p) ? !isDesigner(req) : !isAdmin(req)) return send(res, 401, { error: '請先登入' });
+    if (m === 'POST' && p === '/api/admin/design-logout') { designSessions.delete(cookie(req, 'dsid')); return send(res, 200, { ok: true }, { 'Set-Cookie': 'dsid=; Path=/; Max-Age=0' }); }
     const winnerSet = new Set(db.winners.map((w) => w.entryId));
 
     if (m === 'POST' && p === '/api/admin/logout') { sessions.delete(cookie(req, 'sid')); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; Path=/; Max-Age=0' }); }

@@ -138,6 +138,7 @@
   <div class="top-actions" id="actions" hidden>
     <button class="btn-ghost" id="fsBtn" title="投影用全螢幕">⛶ 全螢幕</button>
     <a class="pill" href="/admin" target="_blank">後台管理</a>
+    <button class="btn-ghost" id="logoutBtn" title="登出（後台也會一起登出）">登出</button>
   </div>
 </header>
 
@@ -190,6 +191,12 @@ $('#loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   try { await api('/api/admin/login', { method: 'POST', body: { password: $('#pw').value } }); $('#loginCard').hidden = true; load(); }
   catch (err) { const b = $('#loginErr'); b.textContent = err.message; b.hidden = false; }
+});
+$('#logoutBtn').addEventListener('click', async () => {
+  if (drawing) return;
+  if (!confirm('確定要登出抽獎畫面嗎？後台也會一起登出。')) return;
+  await fetch('/api/admin/logout', { method: 'POST' }).catch(() => {});
+  $('#pw').value = ''; showLogin();
 });
 $('#fsBtn').addEventListener('click', () => { document.fullscreenElement ? document.exitFullscreen() : $('#stage').requestFullscreen?.(); });
 
