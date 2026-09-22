@@ -66,13 +66,13 @@
   .tray-ball span { color: var(--btn-text); font-weight: 900; font-family: var(--font-display); padding: 0 10%; line-height: 1.15; word-break: break-all; position: relative; z-index: 1; }
   .tray-ball.show { transform: translateX(-50%) scale(1); animation: trayDrop .8s cubic-bezier(.3,1.5,.5,1); }
   @keyframes trayDrop { 0% { transform: translateX(-50%) translateY(-120%) scale(.5); } 100% { transform: translateX(-50%) translateY(0) scale(1); } }
-  .draw-btn { margin: 14px auto 0; width: min(320px, 80%); display: block; font-size: 22px; }
+  .draw-btn { margin: 14px auto 0; width: min(320px, 80%); display: block; font-size: var(--draw-btn-size, 22px); }
   /* ===== 揭曉層：蓋在畫面中上方，抽獎機變暗，姓名一個字一個字出現 ===== */
   .reveal { position: absolute; inset: 0; z-index: 25; pointer-events: none; display: flex; justify-content: center; align-items: flex-start;
     padding: var(--reveal-top, 4vh) 16px 0; opacity: 0; transition: opacity .5s; }
   .reveal.show { opacity: 1; }
   .reveal::before { content: ""; position: absolute; inset: 0; z-index: -1;
-    background: radial-gradient(ellipse 75% 60% at 50% 30%, rgba(20, 0, 2, .84), rgba(20, 0, 2, .6) 55%, rgba(20, 0, 2, .3)); }
+    background: radial-gradient(ellipse 75% 60% at 50% 30%, rgba(20, 0, 2, var(--reveal-backdrop, .84)), rgba(20, 0, 2, calc(var(--reveal-backdrop, .84) * .72)) 55%, rgba(20, 0, 2, calc(var(--reveal-backdrop, .84) * .36))); }
   .reveal-inner { text-align: center; max-width: 100%; }
   .reveal .lbl { color: var(--text); font-size: clamp(20px, 2.3vw, 32px); font-weight: 700; letter-spacing: .35em; text-shadow: 0 2px 10px rgba(0,0,0,.5); }
   .reveal .dept { font-family: var(--font-display); font-size: var(--dept-size); font-weight: 900; letter-spacing: .14em; color: var(--gold-hi);
@@ -98,7 +98,7 @@
   }
   .reveal .nm.done { animation: glow 1.8s ease-in-out infinite; }
   .machine, .stage h2 { transition: opacity .6s, filter .6s; }
-  .stage.revealing .machine, .stage.revealing h2 { opacity: .22; filter: blur(2px); }
+  .stage.revealing .machine, .stage.revealing h2 { opacity: var(--reveal-dim, .22); filter: blur(2px); }
   .draw-btn { position: relative; z-index: 30; }
   /* 揭曉時按鈕移到畫面最下方，不擋住姓名 */
   .stage.revealing .draw-btn { position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%); margin: 0; }
@@ -208,6 +208,23 @@ function render() {
 }
 // 後台改了獎項／遮蔽設定、或有新登記時自動同步
 document.addEventListener('designchange', () => { if (info && !drawing) render(); });
+// 設計後台預覽用：reveal = 直接停在中獎揭曉畫面，draw = 回到抽獎前
+document.addEventListener('previewview', (e) => {
+  if (drawing) return;
+  if (e.detail === 'reveal') {
+    const shown = '王小明';
+    $('#result').innerHTML = `<div class="lbl">${esc(T('draw.congrats'))}</div>
+      <div class="dept">新聞學系</div>
+      <div class="nm-wrap"><div class="rays"></div><div class="nm done">${[...shown].map((c) => `<span class="ch" style="opacity:1;animation:none">${esc(c)}</span>`).join('')}</div></div>`;
+    $('#trayName').textContent = shown;
+    $('#trayName').style.fontSize = 'calc(var(--size) * .062)';
+    $('#trayBall').classList.add('show');
+    $('#reveal').classList.add('show'); $('#stage').classList.add('revealing');
+  } else {
+    $('#reveal').classList.remove('show'); $('#stage').classList.remove('revealing');
+    $('#trayBall').classList.remove('show', 'waiting', 'hit'); $('#result').innerHTML = '';
+  }
+});
 setInterval(() => { if (!DESIGN_PREVIEW && !drawing && !$('#stage').hidden) api('/api/admin/draw-info').then((d) => { info = d; render(); }).catch(() => {}); }, 4000);
 
 // ---------- 彩球物理 ----------
@@ -311,7 +328,7 @@ $('#drawBtn').addEventListener('click', async () => {
     const req = DESIGN_PREVIEW
       ? Promise.resolve({ winner: { name: '王小明', dept: '新聞學系', formerName: '', prize: info.settings.prize }, remaining: Math.max(info.remaining - 1, 0) })
       : api('/api/admin/draw', { method: 'POST', body: {} });
-    [res] = await Promise.all([req, sleep(3800)]);
+    [res] = await Promise.all([req, sleep(cssNum('--mix-duration', 3800))]);
   } catch (err) { mixing = false; drum.classList.remove('spinning'); alert(err.message); drawing = false; render(); return; }
   mixing = false; drum.classList.remove('spinning');
   await sleep(200);
@@ -335,7 +352,7 @@ $('#drawBtn').addEventListener('click', async () => {
     <div class="dept">${esc(w.dept || T('draw.deptEmpty'))}</div>
     <div class="nm-wrap"><div class="nm waiting"><span>•</span><span>•</span><span>•</span></div></div>`;
   $('#reveal').classList.add('show'); $('#stage').classList.add('revealing');
-  await sleep(REVEAL_DELAY);
+  await sleep(cssNum('--reveal-delay', REVEAL_DELAY));
 
   // 第二段：姓名一個字一個字出現
   const chars = [...shown];

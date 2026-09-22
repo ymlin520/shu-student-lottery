@@ -27,9 +27,20 @@ const vars = [
   { key: 'ball-3', group: '抽獎機', label: '彩球 3（珊瑚）', type: 'color', default: '#ff7a8a' },
   { key: 'ball-4', group: '抽獎機', label: '彩球 4（薄荷）', type: 'color', default: '#5fd6a7' },
   { key: 'ball-5', group: '抽獎機', label: '彩球 5（薰衣草）', type: 'color', default: '#b59cff' },
-  { key: 'mix-speed', group: '抽獎機', label: '彩球轉速（0.1 很慢～1 正常）', type: 'text', default: '0.3' },
-  { key: 'name-char-delay', group: '抽獎機', label: '姓名逐字出現間隔（毫秒）', type: 'text', default: '650' },
   { key: 'tray-ball', group: '抽獎機', label: '中獎球', type: 'color', default: '#ffd35c' },
+  // 抽獎畫面（抽獎時的尺寸、位置、秒數）
+  { key: 'mix-speed', group: '抽獎畫面', label: '彩球轉速（0.1 很慢～1 正常）', type: 'text', default: '0.3' },
+  { key: 'name-char-delay', group: '抽獎畫面', label: '姓名逐字出現間隔（毫秒）', type: 'text', default: '650' },
+  { key: 'draw-title-size', group: '抽獎畫面', label: '抽獎頁標題字級', type: 'text', default: 'clamp(22px, 3vw, 34px)' },
+  { key: 'winner-size', group: '抽獎畫面', label: '中獎姓名字級', type: 'text', default: 'clamp(110px, 17vw, 260px)' },
+  { key: 'dept-size', group: '抽獎畫面', label: '中獎系所字級', type: 'text', default: 'clamp(30px, 4vw, 56px)' },
+  { key: 'machine-size', group: '抽獎畫面', label: '抽獎機大小', type: 'text', default: 'min(33vh, 76vw, 440px)' },
+  { key: 'reveal-top', group: '抽獎畫面', label: '揭曉區離畫面頂端距離（姓名位置）', type: 'text', default: '4vh' },
+  { key: 'reveal-delay', group: '抽獎畫面', label: '系所出現後等多久出姓名（毫秒）', type: 'text', default: '3000' },
+  { key: 'mix-duration', group: '抽獎畫面', label: '彩球攪拌時間（毫秒）', type: 'text', default: '3800' },
+  { key: 'reveal-dim', group: '抽獎畫面', label: '揭曉時抽獎機亮度（0～1）', type: 'text', default: '0.22' },
+  { key: 'reveal-backdrop', group: '抽獎畫面', label: '揭曉底色濃度（0～1）', type: 'text', default: '0.84' },
+  { key: 'draw-btn-size', group: '抽獎畫面', label: '「開始抽獎」按鈕字級', type: 'text', default: '22px' },
   // 圖片與 Logo
   { key: 'logo-height', group: '圖片與 Logo', label: '左上角 Logo 高度', type: 'text', default: '48px' },
   { key: 'hub-logo-size', group: '圖片與 Logo', label: '抽獎機中心 Logo 大小', type: 'text', default: '74%' },
@@ -39,11 +50,7 @@ const vars = [
   { key: 'font-display', group: '字型與尺寸', label: '標題字型（標題、中獎姓名）', type: 'text', default: '"Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif' },
   { key: 'radius', group: '字型與尺寸', label: '卡片圓角', type: 'text', default: '26px' },
   { key: 'btn-radius', group: '字型與尺寸', label: '按鈕圓角', type: 'text', default: '999px' },
-  { key: 'reg-title-size', group: '字型與尺寸', label: '登記頁標題字級', type: 'text', default: 'clamp(28px, 5vw, 40px)' },
-  { key: 'draw-title-size', group: '字型與尺寸', label: '抽獎頁標題字級', type: 'text', default: 'clamp(22px, 3vw, 34px)' },
-  { key: 'winner-size', group: '字型與尺寸', label: '中獎姓名字級', type: 'text', default: 'clamp(110px, 17vw, 260px)' },
-  { key: 'dept-size', group: '字型與尺寸', label: '中獎系所字級', type: 'text', default: 'clamp(30px, 4vw, 56px)' },
-  { key: 'machine-size', group: '字型與尺寸', label: '抽獎機大小', type: 'text', default: 'min(33vh, 76vw, 440px)' },
+  { key: 'reg-title-size', group: '字型與尺寸', label: '報名頁標題字級', type: 'text', default: 'clamp(28px, 5vw, 40px)' },
 ];
 
 const texts = [
@@ -86,10 +93,10 @@ const texts = [
 
 // 可在設計後台上傳替換的圖片（沒上傳就用 default）
 const assets = [
-  { key: 'logo', label: '左上角 Logo', hint: '登記頁、抽獎頁、後台左上角。建議透明背景 PNG／WebP，高度 200px 以上。', default: 'assets/logo-70-sm.webp', allowNone: true },
+  { key: 'logo', label: '左上角 Logo', hint: '報名頁、抽獎頁、後台左上角。建議透明背景 PNG／WebP，高度 200px 以上。', default: 'assets/logo-70-sm.webp', allowNone: true },
   { key: 'hub', label: '抽獎機中心 Logo', hint: '抽獎機中央的圓形區域，攪拌時會跟著轉。建議正方形、透明背景。選「不顯示」可改用「抽獎頁文字」裡的轉盤中心文字。', default: 'assets/logo-70-sm.webp', allowNone: true },
   { key: 'favicon', label: '瀏覽器分頁圖示', hint: '分頁標籤上的小圖示。建議正方形 PNG，128×128 以上。', default: 'assets/favicon.png', allowNone: false },
-  { key: 'bg', label: '背景裝飾圖', hint: '整頁背景上的裝飾（目前是同心金圈與紅綢）。會鋪滿畫面，建議 1600×900 以上，或選「不顯示」只留底色。', default: 'assets/bg-deco.svg', allowNone: true },
+  { key: 'bg', label: '背景裝飾圖', hint: '整頁背景上的裝飾（目前是斜向光束與散景光點）。會鋪滿畫面，建議 1600×900 以上，或選「不顯示」只留底色。', default: 'assets/bg-deco.svg', allowNone: true },
 ];
 
 module.exports = { vars, texts, assets };

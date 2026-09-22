@@ -115,7 +115,7 @@
         <button class="on" data-page="form">報名頁</button>
         <button data-page="done">報名完成</button>
         <button data-page="closed">報名截止</button><button data-page="again">已報名過</button>
-        <button data-page="draw">抽獎頁</button>
+        <button data-page="draw">抽獎頁</button><button data-page="drawReveal">抽獎揭曉</button>
       </div>
       <span class="ptip" id="ptip">預覽不會送出資料，也不會真的抽獎</span>
       <div class="seg" id="deviceSeg">
@@ -178,8 +178,9 @@ $('#etabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]'); if (!b) return;
   tab = b.dataset.tab; renderTabs(); renderFields();
   // 切到抽獎相關分頁時，預覽自動換成抽獎頁
-  if ((tab === '抽獎機' || tab === '抽獎頁文字') && page !== 'draw') setPage('draw');
-  if (tab === '報名頁文字' && page === 'draw') setPage('form');
+  if (tab === '抽獎畫面' && page !== 'drawReveal') setPage('drawReveal');
+  if ((tab === '抽獎機' || tab === '抽獎頁文字') && !page.startsWith('draw')) setPage('draw');
+  if (tab === '報名頁文字' && page.startsWith('draw')) setPage('form');
 });
 
 // 把任意 CSS 顏色轉成色票能用的 #rrggbb，並記住透明度
@@ -366,16 +367,16 @@ document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.
 // ---------- 預覽 ----------
 const frame = $('#frame');
 function setPage(p) {
-  const prevDraw = page === 'draw', nowDraw = p === 'draw';
+  const prevDraw = page.startsWith('draw'), nowDraw = p.startsWith('draw');
   page = p;
   document.querySelectorAll('#pageSeg button').forEach((b) => b.classList.toggle('on', b.dataset.page === p));
-  $('#ptip').textContent = nowDraw ? '可以按預覽裡的「開始抽獎」試看動畫（不會真的抽）' : '預覽不會送出資料，也不會真的抽獎';
+  $('#ptip').textContent = p === 'drawReveal' ? '直接顯示中獎揭曉畫面，調整「抽獎畫面」分頁會即時變化' : nowDraw ? '可以按預覽裡的「開始抽獎」試看完整動畫（不會真的抽）' : '預覽不會送出資料，也不會真的抽獎';
   const want = nowDraw ? '/draw?preview' : '/?preview';
   if (!frame.src.endsWith(want) || prevDraw !== nowDraw) frame.src = want;
   else pushView();
 }
 function push() { frame.contentWindow?.postMessage({ type: 'design', design: work }, location.origin); }
-function pushView() { if (page !== 'draw') frame.contentWindow?.postMessage({ type: 'view', view: page }, location.origin); }
+function pushView() { frame.contentWindow?.postMessage({ type: 'view', view: page === 'drawReveal' ? 'reveal' : page }, location.origin); }
 window.addEventListener('message', (e) => {
   if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
   if (e.data?.type === 'preview-ready') { push(); pushView(); }
