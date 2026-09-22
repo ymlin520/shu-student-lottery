@@ -1,0 +1,2 @@
+# Windows 批次檔含中文，必須用 CRLF 換行，cmd 才讀得懂
+*.bat text eol=crlf
