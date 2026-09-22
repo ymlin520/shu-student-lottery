@@ -232,20 +232,27 @@ const COLORS = ['c-gold', 'c-teal', 'c-pink', 'c-green', 'c-purple'];
 const drum = $('#drum');
 let balls = [], mixing = false, drawing = false, simDt = 1;
 const cssNum = (name, def) => { const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)); return Number.isFinite(v) && v > 0 ? v : def; };
-function dims() { const D = drum.clientWidth; return { D, R: D / 2, r: D * 0.068, hub: D * 0.135 + D * 0.012 }; }
-function buildBalls(n) {
-  n = Math.min(n, 26);
-  if (balls.length === n) return;
-  balls.forEach((b) => b.el.remove());
-  const { D, R, r } = dims();
-  balls = Array.from({ length: n }, (_, i) => {
-    const el = document.createElement('div');
-    el.className = 'ball ' + COLORS[i % COLORS.length];
-    el.style.width = el.style.height = r * 2 + 'px';
-    drum.appendChild(el);
-    const a = Math.random() * Math.PI * 2, d = R * (0.45 + Math.random() * 0.4);
-    return { el, x: R + Math.cos(a) * d, y: R + Math.sin(a) * d, vx: (Math.random() - .5) * 4, vy: (Math.random() - .5) * 4, picked: false };
-  });
+let ballRatio = 0.062; // 球半徑佔球槽直徑的比例，由 --ball-size 控制
+function dims() { const D = drum.clientWidth; return { D, R: D / 2, r: D * ballRatio, hub: D * 0.135 + D * 0.012 }; }
+let colorSeq = 0;
+function makeBall(fromTop) {
+  const { R, r } = dims();
+  const el = document.createElement('div');
+  el.className = 'ball ' + COLORS[colorSeq++ % COLORS.length];
+  el.style.width = el.style.height = r * 2 + 'px';
+  drum.appendChild(el);
+  const a = fromTop ? -Math.PI / 2 + (Math.random() - .5) * 0.8 : Math.random() * Math.PI * 2;
+  const d = fromTop ? R * 0.7 : R * (0.45 + Math.random() * 0.4);
+  return { el, x: R + Math.cos(a) * d, y: R + Math.sin(a) * d, vx: (Math.random() - .5) * 4, vy: fromTop ? 2 : (Math.random() - .5) * 4, picked: false };
+}
+// remaining > 0 時球槽裝滿（預設 32 顆，設計後台可調）；抽完才清空
+function buildBalls(remaining) {
+  const newRatio = Math.min(Math.max(cssNum('--ball-size', 0.062), 0.03), 0.1);
+  if (newRatio !== ballRatio) { ballRatio = newRatio; const { r } = dims(); balls.forEach((b) => b.el.style.width = b.el.style.height = r * 2 + 'px'); }
+  const n = remaining > 0 ? Math.round(Math.min(Math.max(cssNum('--ball-count', 32), 1), 60)) : 0;
+  const initial = balls.length === 0;
+  while (balls.length > n) balls.pop().el.remove();
+  while (balls.length < n) balls.push(makeBall(!initial)); // 補的球從上方掉進來
 }
 function step() {
   const { D, R, r, hub } = dims();

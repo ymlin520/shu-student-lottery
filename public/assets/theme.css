@@ -38,7 +38,9 @@
   --dept-size: clamp(30px, 4vw, 56px);
   --machine-size: min(33vh, 76vw, 440px);
   --logo-height: 48px;
-  --mix-speed: 0.3;
+  --mix-speed: 0.3;
+  --ball-count: 32;
+  --ball-size: 0.062;
   --name-char-delay: 650;
   --reveal-top: 4vh;
   --reveal-delay: 3000;
