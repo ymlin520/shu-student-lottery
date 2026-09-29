@@ -9,15 +9,39 @@
 <style>
   [hidden] { display: none !important; }
   body { overflow-x: hidden; }
+  /* 抽獎畫面是一塊固定 4096x2048 的版面（可在 /design 改），整塊等比例縮放去貼合實際螢幕。
+     版面內的尺寸一律用 --vw / --vh / --vmin，算的是這塊版面的百分之一，不是瀏覽器視窗。 */
+  :root {
+    --vw: calc(var(--stage-w, 4096px) / 100);
+    --vh: calc(var(--stage-h, 2048px) / 100);
+    --vmin: calc(min(var(--stage-w, 4096px), var(--stage-h, 2048px)) / 100);
+  }
   .topbar { padding-top: 12px; padding-bottom: 6px; }
+  /* 頂端列不在縮放版面裡，用真實 px；投影時左上角名稱要看得清楚 */
+  .topbar .brand { font-size: var(--draw-brand-size, 30px); }
   .login { max-width: 400px; margin: 12vh auto 0; padding: 32px 28px; }
   .login h1 { margin: 0 0 20px; font-size: 22px; letter-spacing: .1em; }
   .top-actions { display: flex; gap: 10px; align-items: center; }
 
   /* ===== 抽獎舞台（整頁） ===== */
-  .stage { min-height: calc(100vh - 90px); padding: 0 16px 12px; text-align: center; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
-  .stage:fullscreen { min-height: 100vh; justify-content: center; background: var(--bg-deco, url(/brand/bg)) center / cover no-repeat, radial-gradient(900px 560px at 50% 40%, var(--glow1) 0%, transparent 70%), linear-gradient(180deg, var(--bg), var(--bg2)); }
-  .stage h2 { margin: 10px 0 12px; font-size: var(--draw-title-size); letter-spacing: .16em; font-family: var(--font-display); color: var(--gold-hi); }
+  /* 舞台＝實際可用的那塊螢幕。頂端列高度由 JS 量出來寫進 --topbar-h，不要寫死，
+     否則會多出一條空白、或擠出捲軸把版面推歪。 */
+  /* 舞台與版面都不要自己畫背景，直接讓整頁的底圖（body::before）透上來，
+     這樣 header 和抽獎區才是同一張背景、不會有接縫，裝飾圖的取景也跟其他頁一致。
+     只有全螢幕時舞台蓋住整個畫面、看不到 body，才需要自己補一份背景。 */
+  .stage { position: fixed; left: 0; right: 0; top: var(--topbar-h, 66px); bottom: 0; z-index: 1; overflow: hidden; }
+  .stage:fullscreen { top: 0;
+    background: var(--bg-deco, url(/brand/bg)) center / cover no-repeat,
+                radial-gradient(900px 560px at 50% 32%, var(--glow1) 0%, transparent 70%),
+                linear-gradient(180deg, var(--bg), var(--bg2)); }
+  .canvas {
+    position: absolute; left: 50%; top: 50%;
+    width: var(--stage-w, 4096px); height: var(--stage-h, 2048px);
+    transform: translate(-50%, -50%) scale(var(--stage-scale, 1)); transform-origin: 50% 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 0 calc(1 * var(--vw));
+  }
+  .stage h2 { margin: 21px 0 26px; font-size: var(--draw-title-size); letter-spacing: .16em; font-family: var(--font-display); color: var(--gold-hi); }
   .hub-logo { width: var(--hub-logo-size, 74%); height: auto; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.4)); }
   .hub-text:empty { display: none; }
   .hub-text { position: absolute; bottom: 12%; left: 0; right: 0; font-size: calc(var(--size) * .022); }
@@ -26,61 +50,105 @@
   .ring {
     width: var(--size); height: var(--size); border-radius: 50%; position: relative; padding: 4.2%;
     background: conic-gradient(from 200deg, var(--ring-a), var(--ring-b) 18%, var(--ring-c) 35%, color-mix(in srgb, var(--ring-a) 50%, var(--ring-b)) 52%, color-mix(in srgb, var(--ring-b) 70%, var(--ring-c)) 70%, var(--ring-a) 88%, var(--ring-b));
-    box-shadow: 0 0 0 3px rgba(0,0,0,.25), 0 30px 60px rgba(0,0,0,.45), 0 0 80px rgba(216,172,90,.18);
+    box-shadow: 0 0 0 6px rgba(0,0,0,.25), 0 64px 128px rgba(0,0,0,.45), 0 0 170px rgba(216,172,90,.18);
   }
   .drum {
     width: 100%; height: 100%; border-radius: 50%; position: relative; overflow: hidden;
     background: radial-gradient(circle at 50% 42%, var(--drum-a) 0%, color-mix(in srgb, var(--drum-a) 50%, var(--drum-b)) 55%, var(--drum-b) 100%);
-    box-shadow: inset 0 0 40px rgba(0,0,0,.6), inset 0 0 0 2px rgba(255,255,255,.06);
+    box-shadow: inset 0 0 85px rgba(0,0,0,.6), inset 0 0 0 4px rgba(255,255,255,.06);
   }
   .drum::before { /* 玻璃反光 */
     content: ""; position: absolute; inset: 6% 12% 55% 12%; border-radius: 50%; z-index: 5; pointer-events: none;
     background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.14), transparent 70%);
   }
   .drum::after { /* 內圈 */
-    content: ""; position: absolute; inset: 5%; border-radius: 50%; border: 1px solid rgba(255,255,255,.07); pointer-events: none;
+    content: ""; position: absolute; inset: 5%; border-radius: 50%; border: 2px solid rgba(255,255,255,.07); pointer-events: none;
   }
   .hub {
     position: absolute; left: 50%; top: 50%; width: 27%; height: 27%; transform: translate(-50%, -50%); border-radius: 50%; z-index: 4;
     display: grid; place-items: center; text-align: center; color: var(--gold-hi); font-weight: 800; letter-spacing: .18em;
     font-size: calc(var(--size) * .032); line-height: 1.5;
     background: radial-gradient(circle at 40% 35%, var(--drum-a), var(--bg) 70%);
-    border: calc(var(--size) * .012) solid var(--gold); box-shadow: 0 0 0 3px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4);
+    border: calc(var(--size) * .012) solid var(--gold); box-shadow: 0 0 0 6px rgba(0,0,0,.35), 0 17px 43px rgba(0,0,0,.4);
   }
   .drum .ball { z-index: 2; will-change: transform; }
-  .drum .ball.picked { transition: transform .45s cubic-bezier(.5,0,.8,.4), opacity .25s .35s; z-index: 6; }
+  /* 中獎球慢慢滾出來；時間由 --ball-out-ms 控制（設計後台可調） */
+  .drum .ball.picked { z-index: 6;
+    transition: transform calc(var(--ball-out-ms, 4600) * 1ms) cubic-bezier(.32, 0, .5, 1),
+                opacity calc(var(--ball-out-ms, 4600) * .25ms) calc(var(--ball-out-ms, 4600) * .72ms); }
   .spinning .hub { animation: hubspin 1.2s linear infinite; }
   @keyframes hubspin { to { transform: translate(-50%, -50%) rotate(360deg); } }
   .tray {
     position: relative; width: 60%; height: calc(var(--size) * .12); margin: calc(var(--size) * -.1) auto 0; z-index: 8;
-    border-radius: 0 0 18px 18px;
+    border-radius: 0 0 38px 38px;
     background: linear-gradient(180deg, color-mix(in srgb, var(--ring-a) 50%, var(--ring-b)), var(--ring-b) 60%, var(--ring-c));
-    box-shadow: 0 10px 20px rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.5);
+    box-shadow: 0 21px 43px rgba(0,0,0,.35), inset 0 4px 0 rgba(255,255,255,.5);
   }
   .tray-ball {
     position: absolute; left: 50%; bottom: 20%; width: calc(var(--size) * .3); height: calc(var(--size) * .3);
     transform: translateX(-50%) scale(0); border-radius: 50%; display: grid; place-items: center; z-index: 9;
     background: radial-gradient(circle at 35% 28%, color-mix(in srgb, var(--tray-ball) 25%, white), var(--tray-ball) 45%, color-mix(in srgb, var(--tray-ball) 65%, black) 100%);
-    box-shadow: inset -8px -10px 18px rgba(0,0,0,.25), 0 12px 24px rgba(0,0,0,.4), 0 0 0 4px rgba(255,255,255,.15);
+    box-shadow: inset -17px -21px 38px rgba(0,0,0,.25), 0 26px 51px rgba(0,0,0,.4), 0 0 0 9px rgba(255,255,255,.15);
   }
   .tray-ball span { color: var(--btn-text); font-weight: 900; font-family: var(--font-display); padding: 0 10%; line-height: 1.15; word-break: break-all; position: relative; z-index: 1; }
-  .tray-ball.show { transform: translateX(-50%) scale(1); animation: trayDrop .8s cubic-bezier(.3,1.5,.5,1); }
-  @keyframes trayDrop { 0% { transform: translateX(-50%) translateY(-120%) scale(.5); } 100% { transform: translateX(-50%) translateY(0) scale(1); } }
-  .draw-btn { margin: 14px auto 0; width: min(320px, 80%); display: block; font-size: var(--draw-btn-size, 22px); }
+  /* 「？」球與中獎球掉進承接槽的速度，由 --qball-in-ms 控制 */
+  .tray-ball.show { transform: translateX(-50%) translateY(var(--tray-ball-dy, 0px)) scale(1);
+    animation: trayDrop calc(var(--qball-in-ms, 1800) * 1ms) cubic-bezier(.25,1.25,.45,1); }
+  /* 球從中央 70 logo 的位置冒出來（-115% 剛好是球槽圓心），由小變大，停在畫面正中央。
+     --tray-ball-dy 由 JS 量出來（承接槽位置 → 版面正中央要移動多少）。 */
+  @keyframes trayDrop {
+    0%   { transform: translateX(-50%) translateY(-115%) scale(.06); opacity: 0; }
+    14%  { transform: translateX(-50%) translateY(-112%) scale(.3); opacity: 1; }
+    100% { transform: translateX(-50%) translateY(var(--tray-ball-dy, 0px)) scale(1); opacity: 1; }
+  }
+  /* ===== 開場：一顆球從畫面外一路彈跳，最後大跳進抽獎機 ===== */
+  .intro-ball {
+    position: absolute; left: 0; top: 0; border-radius: 50%; z-index: 22; pointer-events: none; will-change: transform;
+    background: radial-gradient(circle at 35% 28%, color-mix(in srgb, var(--tray-ball) 25%, white), var(--tray-ball) 45%, color-mix(in srgb, var(--tray-ball) 65%, black) 100%);
+    box-shadow: inset -10px -12px 22px rgba(0,0,0,.25), 0 18px 34px rgba(0,0,0,.45), 0 0 40px rgba(255, 220, 140, .35);
+  }
+  .intro-ball::after { /* 反光小亮點，滾動時比較看得出在轉 */
+    content: ""; position: absolute; left: 24%; top: 18%; width: 22%; height: 16%; border-radius: 50%;
+    background: rgba(255,255,255,.75); filter: blur(2px);
+  }
+  .puff { position: absolute; border-radius: 50%; z-index: 21; pointer-events: none;
+    border: 6px solid rgba(255, 240, 200, .8); animation: puff .55s ease-out forwards; }
+  @keyframes puff {
+    from { transform: translate(-50%, -50%) scale(.25); opacity: .95; }
+    to   { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+  }
+  /* 球跳進去的瞬間，整台抽獎機被撞得晃一下 */
+  @keyframes machineShake {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    12% { transform: translate(-1.6%, 2.2%) rotate(-2deg); }
+    30% { transform: translate(1.8%, -1.4%) rotate(1.7deg); }
+    48% { transform: translate(-1.2%, 1.1%) rotate(-1.1deg); }
+    66% { transform: translate(.9%, -.7%) rotate(.7deg); }
+    84% { transform: translate(-.4%, .3%) rotate(-.3deg); }
+  }
+  .machine.shake { animation: machineShake .8s cubic-bezier(.36, .07, .19, .97); }
+  /* 按鈕的框也要跟著字一起放大（theme.css 的 padding 是給一般頁面的 20px 字用的） */
+  .draw-btn { margin: calc(2 * var(--vh)) auto 0; width: min(1260px, 88%); display: block;
+    font-size: var(--draw-btn-size, 82px); padding: calc(2.3 * var(--vh)) calc(3.6 * var(--vw));
+    border-radius: calc(1.9 * var(--vh)); box-shadow: 0 16px 0 var(--gold-lo), 0 40px 72px rgba(20, 0, 2, .35); }
+  .draw-btn:active { box-shadow: 0 4px 0 var(--gold-lo), 0 17px 38px rgba(20, 0, 2, .3); }
   /* ===== 揭曉層：蓋在畫面中上方，抽獎機變暗，姓名一個字一個字出現 ===== */
   .reveal { position: absolute; inset: 0; z-index: 25; pointer-events: none; display: flex; justify-content: center; align-items: flex-start;
-    padding: var(--reveal-top, 4vh) 16px 0; opacity: 0; transition: opacity .5s; }
+    padding: var(--reveal-top, calc(14 * var(--vh))) calc(1 * var(--vw)) 0; opacity: 0; transition: opacity .5s; }
   .reveal.show { opacity: 1; }
   .reveal::before { content: ""; position: absolute; inset: 0; z-index: -1;
     background: radial-gradient(ellipse 75% 60% at 50% 30%, rgba(20, 0, 2, var(--reveal-backdrop, .84)), rgba(20, 0, 2, calc(var(--reveal-backdrop, .84) * .72)) 55%, rgba(20, 0, 2, calc(var(--reveal-backdrop, .84) * .36))); }
   .reveal-inner { text-align: center; max-width: 100%; }
-  .reveal .lbl { color: var(--text); font-size: clamp(20px, 2.3vw, 32px); font-weight: 700; letter-spacing: .35em; text-shadow: 0 2px 10px rgba(0,0,0,.5); }
-  .reveal .dept { font-family: var(--font-display); font-size: var(--dept-size); font-weight: 900; letter-spacing: .14em; color: var(--gold-hi);
-    text-shadow: 0 3px 14px rgba(0, 0, 0, .55); margin-top: 8px; animation: pop .5s cubic-bezier(.3,1.6,.5,1); }
-  .reveal .meta { color: var(--muted); font-size: clamp(16px, 1.6vw, 22px); margin-top: 6px; }
-  .nm-wrap { position: relative; display: inline-block; isolation: isolate; margin-top: 2px; }
-  .reveal .nm { font-size: var(--winner-size); line-height: 1.12; font-weight: 900; font-family: var(--font-display); letter-spacing: .06em; white-space: nowrap;
-    filter: drop-shadow(0 0 20px rgba(255, 214, 130, .75)) drop-shadow(0 6px 0 rgba(90, 20, 0, .55)); }
+  .reveal .lbl { color: var(--text); font-size: clamp(43px, calc(2.3 * var(--vw)), 68px); font-weight: 700; letter-spacing: .35em; text-shadow: 0 4px 21px rgba(0,0,0,.5); }
+  /* padding-left 補回 letter-spacing 在最後一個字後面多出來的空隙，字才會真的置中 */
+  .reveal .dept { font-family: var(--font-display); font-size: var(--dept-size); font-weight: 900; color: var(--gold-hi);
+    letter-spacing: var(--dept-spacing, 0.5em); padding-left: var(--dept-spacing, 0.5em);
+    text-shadow: 0 6px 30px rgba(0, 0, 0, .55); margin-top: 17px; animation: pop .5s cubic-bezier(.3,1.6,.5,1); }
+  .reveal .meta { color: var(--muted); font-size: clamp(34px, calc(1.6 * var(--vw)), 47px); margin-top: 13px; }
+  .nm-wrap { position: relative; display: inline-block; isolation: isolate; margin-top: var(--name-gap, calc(3.5 * var(--vh))); }
+  .reveal .nm { font-size: var(--winner-size); line-height: 1.12; font-weight: 900; font-family: var(--font-display); white-space: nowrap;
+    letter-spacing: var(--name-spacing, 0.45em); padding-left: var(--name-spacing, 0.45em);
+    filter: drop-shadow(0 0 43px rgba(255, 214, 130, .75)) drop-shadow(0 13px 0 rgba(90, 20, 0, .55)); }
   .reveal .nm.waiting { color: var(--gold); font-size: calc(var(--winner-size) * .45); letter-spacing: .4em; filter: none; }
   .reveal .nm.waiting span { display: inline-block; animation: blink 1s ease-in-out infinite; }
   .reveal .nm.waiting span:nth-child(2) { animation-delay: .2s; }
@@ -98,35 +166,37 @@
   }
   .reveal .nm.done { animation: glow 1.8s ease-in-out infinite; }
   .machine, .stage h2 { transition: opacity .6s, filter .6s; }
-  .stage.revealing .machine, .stage.revealing h2 { opacity: var(--reveal-dim, .22); filter: blur(2px); }
+  .stage.revealing .machine, .stage.revealing h2 { opacity: var(--reveal-dim, .22); filter: blur(4px); }
   .draw-btn { position: relative; z-index: 30; }
   /* 揭曉時按鈕移到畫面最下方，不擋住姓名 */
-  .stage.revealing .draw-btn { position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%); margin: 0; }
+  .stage.revealing .draw-btn { position: absolute; left: 50%; bottom: calc(5 * var(--vh)); transform: translateX(-50%); margin: 0; }
   .stage.revealing .draw-btn:active { transform: translateX(-50%) translateY(4px); }
   @keyframes glow {
-    50% { filter: drop-shadow(0 0 34px rgba(255, 226, 150, 1)) drop-shadow(0 5px 0 rgba(90, 20, 0, .55)); }
+    50% { filter: drop-shadow(0 0 73px rgba(255, 226, 150, 1)) drop-shadow(0 11px 0 rgba(90, 20, 0, .55)); }
   }
   .burst, .rays { position: absolute; left: 50%; top: 50%; pointer-events: none; z-index: -1; border-radius: 50%; }
-  .burst { width: 80vmin; height: 80vmin; transform: translate(-50%, -50%) scale(0);
+  .burst { width: calc(80 * var(--vmin)); height: calc(80 * var(--vmin)); transform: translate(-50%, -50%) scale(0);
     background: radial-gradient(circle, rgba(255, 240, 190, .95) 0%, rgba(255, 200, 90, .45) 28%, rgba(255, 160, 60, 0) 62%);
     animation: burst 1.2s ease-out forwards; }
   @keyframes burst { 0% { transform: translate(-50%, -50%) scale(0); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; } }
-  .rays { width: 110vmin; height: 110vmin; transform: translate(-50%, -50%); opacity: 0;
+  .rays { width: calc(110 * var(--vmin)); height: calc(110 * var(--vmin)); transform: translate(-50%, -50%); opacity: 0;
     background: repeating-conic-gradient(rgba(255, 222, 150, .30) 0deg 5deg, transparent 5deg 15deg);
     -webkit-mask: radial-gradient(circle, #000 12%, transparent 62%); mask: radial-gradient(circle, #000 12%, transparent 62%);
     animation: raysIn .8s ease-out .15s forwards, spin 22s linear infinite; }
   @keyframes raysIn { to { opacity: 1; } }
   @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
-  .flash { position: fixed; inset: 0; z-index: 28; pointer-events: none;
+  .flash { position: absolute; inset: 0; z-index: 28; pointer-events: none;
     background: radial-gradient(circle at 50% 30%, rgba(255, 240, 200, .75), rgba(255, 210, 120, .25) 45%, transparent 75%);
     animation: flash .7s ease-out forwards; }
   @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
-  .tray-ball.hit { animation: trayDrop .8s cubic-bezier(.3,1.5,.5,1), trayGlow 1.8s ease-in-out .8s infinite; }
-  @keyframes trayGlow { 50% { box-shadow: inset -8px -10px 18px rgba(0,0,0,.25), 0 0 34px rgba(255, 220, 140, .9), 0 0 0 4px rgba(255,255,255,.25); } }
+  .tray-ball.hit { transform: translateX(-50%) translateY(var(--tray-ball-dy, 0px)) scale(1);
+    animation: trayDrop calc(var(--qball-in-ms, 1800) * 1ms) cubic-bezier(.25,1.25,.45,1),
+                              trayGlow 1.8s ease-in-out calc(var(--qball-in-ms, 1800) * 1ms) infinite; }
+  @keyframes trayGlow { 50% { box-shadow: inset -17px -21px 38px rgba(0,0,0,.25), 0 0 73px rgba(255, 220, 140, .9), 0 0 0 9px rgba(255,255,255,.25); } }
   .tray-ball.waiting span { animation: blink 1s ease-in-out infinite; }
   @keyframes pop { from { transform: scale(.6); } }
-  .confetti { position: absolute; top: -12px; width: 9px; height: 14px; z-index: 20; pointer-events: none; animation: fall linear forwards; }
-  @keyframes fall { to { transform: translateY(110vh) rotate(720deg); opacity: .8; } }
+  .confetti { position: absolute; top: -26px; width: 19px; height: 30px; z-index: 20; pointer-events: none; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(calc(110 * var(--vh))) rotate(720deg); opacity: .8; } }
   @media (max-width: 760px) { #fsBtn { display: none; } }
 </style>
 </head>
@@ -137,8 +207,6 @@
   <div class="id-badge" data-t="draw.badge">在校生場　STUDENTS</div>
   <div class="top-actions" id="actions" hidden>
     <button class="btn-ghost" id="fsBtn" title="投影用全螢幕">⛶ 全螢幕</button>
-    <a class="pill" href="/admin" target="_blank">後台管理</a>
-    <button class="btn-ghost" id="logoutBtn" title="登出（後台也會一起登出）">登出</button>
   </div>
 </header>
 
@@ -153,6 +221,7 @@
 </section>
 
 <main class="stage" id="stage" hidden>
+ <div class="canvas" id="canvas">
   <h2 data-t="draw.heading">今天的幸運同學是誰？</h2>
   <div class="machine">
     <div class="ring">
@@ -163,6 +232,7 @@
   <button class="btn-gold draw-btn" id="drawBtn">開始抽獎</button>
   <span hidden data-t="draw.button">開始抽獎</span><span hidden data-t="draw.drawing">抽獎中…</span><span hidden data-t="draw.allDone">全部抽完了</span><span hidden data-t="draw.congrats">恭喜抽中</span><span hidden data-t="draw.former">原名</span>
   <div class="reveal" id="reveal" aria-live="polite"><div class="reveal-inner" id="result"></div></div>
+ </div>
 </main>
 
 <script src="/assets/design.js"></script>
@@ -192,18 +262,49 @@ $('#loginForm').addEventListener('submit', async (e) => {
   try { await api('/api/admin/login', { method: 'POST', body: { password: $('#pw').value } }); $('#loginCard').hidden = true; load(); }
   catch (err) { const b = $('#loginErr'); b.textContent = err.message; b.hidden = false; }
 });
-$('#logoutBtn').addEventListener('click', async () => {
-  if (drawing) return;
-  if (!confirm('確定要登出抽獎畫面嗎？後台也會一起登出。')) return;
-  await fetch('/api/admin/logout', { method: 'POST' }).catch(() => {});
-  $('#pw').value = ''; showLogin();
-});
 $('#fsBtn').addEventListener('click', () => { document.fullscreenElement ? document.exitFullscreen() : $('#stage').requestFullscreen?.(); });
+
+// 固定版面（預設 4096x2048）整塊等比例縮到實際螢幕，構圖在任何螢幕上都一樣。
+// 螢幕比例和版面接近時（例如 16:9）直接放大到填滿、上下切掉一點點留白；
+// 差太多才退回留邊，免得把抽獎機或姓名切掉。
+function fitStage() {
+  const st = $('#stage'), cv = $('#canvas'), bar = document.querySelector('.topbar');
+  if (!st || !cv) return;
+  if (bar) document.documentElement.style.setProperty('--topbar-h', bar.offsetHeight + 'px');
+  if (st.hidden) return;
+  const w = cv.offsetWidth, h = cv.offsetHeight; // 版面本身的尺寸，不受 scale 影響
+  const sw = st.clientWidth, sh = st.clientHeight;
+  if (!w || !h || !sw || !sh) return;
+  // 版面四周這圈留白可以被裁掉（上下 5%＝跟「恭喜抽中」和按鈕的 5vh 一樣，左右 7%），
+  // 只要這圈以內的內容完整看得到就好，這樣 16:9 螢幕幾乎能填滿又不會切到字。
+  // 抓 6%（內容實際只到 5%），多留 1% 當餘裕，免得四捨五入剛好啃到字
+  const safe = Math.min(sw / (w * 0.86), sh / (h * 0.88));
+  const cover = Math.max(sw / w, sh / h); // 填滿螢幕就夠了，不要再放大（版面尺寸剛好時＝1:1）
+  const s = Math.min(safe, cover);
+  if (s > 0) cv.style.setProperty('--stage-scale', s);
+  centerTrayBall();
+}
+// 量出「承接槽的球」要往上移多少才會落在版面正中央，寫進 --tray-ball-dy
+function centerTrayBall() {
+  const cv = $('#canvas'), tb = $('#trayBall');
+  if (!cv || !tb || $('#stage').hidden) return;
+  // 掉落動畫進行中量到的是半途位置，跳過
+  if (document.getAnimations().some((a) => a.effect && a.effect.target === tb && a.animationName === 'trayDrop' && a.playState === 'running')) return;
+  cv.style.setProperty('--tray-ball-dy', '0px'); // 先歸零再量原始位置
+  const s = parseFloat(cv.style.getPropertyValue('--stage-scale')) || 1;
+  const c = cv.getBoundingClientRect(), b = tb.getBoundingClientRect();
+  if (!c.height) return;
+  const dy = ((c.top + c.bottom) / 2 - (b.top + b.bottom) / 2) / s;
+  cv.style.setProperty('--tray-ball-dy', Math.round(dy) + 'px');
+}
+window.addEventListener('resize', fitStage);
+document.addEventListener('fullscreenchange', () => setTimeout(fitStage, 60));
 
 async function load() {
   if (DESIGN_PREVIEW) info = { settings: { prize: '頭獎', maskName: false }, remaining: 30 };
   else try { info = await api('/api/admin/draw-info'); } catch { return; }
   $('#stage').hidden = false; $('#actions').hidden = false;
+  fitStage();
   render();
 }
 function render() {
@@ -214,7 +315,7 @@ function render() {
   }
 }
 // 後台改了獎項／遮蔽設定、或有新登記時自動同步
-document.addEventListener('designchange', () => { if (info && !drawing) render(); });
+document.addEventListener('designchange', () => { fitStage(); if (info && !drawing) render(); });
 // 設計後台預覽用：reveal = 直接停在中獎揭曉畫面，draw = 回到抽獎前
 document.addEventListener('previewview', (e) => {
   if (drawing) return;
@@ -228,6 +329,7 @@ document.addEventListener('previewview', (e) => {
     $('#trayBall').classList.add('show');
     $('#reveal').classList.add('show'); $('#stage').classList.add('revealing');
   } else {
+    stopConfetti();
     $('#reveal').classList.remove('show'); $('#stage').classList.remove('revealing');
     $('#trayBall').classList.remove('show', 'waiting', 'hit'); $('#result').innerHTML = '';
   }
@@ -309,6 +411,11 @@ function step() {
       if (rv < 0) { const k = -(1 + e) * rv / 2; a.vx -= k * nx; a.vy -= k * ny; b.vx += k * nx; b.vy += k * ny; }
     }
   }
+  // 球與球互推之後可能把球擠出球槽、被圓形邊緣切掉，收尾再夾回範圍內
+  for (const b of live) {
+    const dx = b.x - R, dy = b.y - R, d = Math.hypot(dx, dy);
+    if (d > limit) { b.x = R + dx / d * limit; b.y = R + dy / d * limit; }
+  }
   for (const b of live) b.el.style.transform = `translate(${b.x - r}px, ${b.y - r}px)`;
   requestAnimationFrame(step);
 }
@@ -317,38 +424,169 @@ window.addEventListener('resize', () => { const { r } = dims(); balls.forEach((b
 document.addEventListener('fullscreenchange', () => setTimeout(() => { const { r } = dims(); balls.forEach((b) => b.el.style.width = b.el.style.height = r * 2 + 'px'); }, 50));
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+// ---------- 開場動畫：球從畫面外彈跳進抽獎機 ----------
+// 元素左上角在版面（#canvas）座標系的位置；用 offset 系列，不受整塊版面的 scale 影響
+function offsetIn(el, root) {
+  let x = 0, y = 0, n = el;
+  while (n && n !== root) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+  return { x, y };
+}
+function puff(x, y, size) {
+  const cv = $('#canvas');
+  if (!cv) return;
+  const d = document.createElement('div');
+  d.className = 'puff';
+  d.style.width = d.style.height = Math.round(size * 1.4) + 'px';
+  d.style.left = Math.round(x) + 'px';
+  d.style.top = Math.round(y) + 'px';
+  cv.appendChild(d);
+  setTimeout(() => d.remove(), 700);
+}
+function introBall() {
+  const cv = $('#canvas'), machine = $('.machine');
+  // 直接讀，不走 cssNum：要讓後台填 0 真的能關掉（cssNum 遇到 0 會回退成預設值）
+  const raw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-ms'));
+  const ms = Number.isFinite(raw) ? raw : 3400;
+  if (!cv || !machine || !drum.offsetWidth || ms < 200) return Promise.resolve();
+  const cw = cv.offsetWidth, p = offsetIn(drum, cv), dW = drum.offsetWidth;
+  const cx = p.x + dW / 2, cy = p.y + dW / 2;   // 球槽中心
+  const size = Math.round(dW * 0.15);
+  const floor = p.y + dW + size * 1.1;          // 抽獎機下方當作地面
+  const h = dW * 0.5;                           // 彈跳高度基準
+
+  const el = document.createElement('div');
+  el.className = 'intro-ball';
+  el.style.width = el.style.height = size + 'px';
+  cv.appendChild(el);
+
+  // 以球心給座標，轉成左上角的位移；rot 讓球看起來一直在滾，sx/sy 做擠壓與拉長
+  const T = (x, y, rot, sx, sy) => `translate(${Math.round(x - size / 2)}px, ${Math.round(y - size / 2)}px) rotate(${rot}deg) scale(${sx}, ${sy})`;
+  const UP = 'cubic-bezier(.3,.62,.7,1)';   // 往上：越接近頂點越慢
+  const DOWN = 'cubic-bezier(.3,0,.7,.42)'; // 往下：越接近地面越快
+  const takeoff = cw * .33;                              // 起跳點，留在抽獎機左邊
+  const apex = Math.max(cy - dW * .75, cv.offsetHeight * .09); // 大跳最高點：夠高但不會飛出畫面
+  const frames = [
+    { offset: 0,   transform: T(-size, floor, 0, 1, 1), easing: DOWN },
+    { offset: .10, transform: T(cw * .07, floor - h * .55, 190, .88, 1.14), easing: UP },
+    { offset: .20, transform: T(cw * .13, floor, 310, 1.32, .7), easing: DOWN },
+    { offset: .31, transform: T(cw * .19, floor - h * .9, 480, .86, 1.18), easing: UP },
+    { offset: .41, transform: T(cw * .25, floor, 610, 1.36, .68), easing: DOWN },
+    { offset: .52, transform: T(cw * .29, floor - h * 1.3, 790, .84, 1.22), easing: UP },
+    { offset: .60, transform: T(takeoff, floor, 900, 1.5, .55), easing: 'cubic-bezier(.2,.9,.4,1)' },   // 落地壓扁蓄力
+    { offset: .67, transform: T(takeoff + size * .2, floor - h * .12, 940, .66, 1.5), easing: 'cubic-bezier(.25,0,.5,.55)' }, // 拉長彈起
+    { offset: .86, transform: T((cx + takeoff) / 2, apex, 1260, .95, 1.06), easing: 'cubic-bezier(.5,0,.85,.6)' }, // 飛越到球槽上方
+    { offset: .97, transform: T(cx, cy, 1520, 1.12, .9), opacity: 1, easing: 'ease-out' },              // 砸進球槽
+    { offset: 1,   transform: T(cx, cy, 1540, .28, .28), opacity: 0 },                                  // 混進球堆裡
+  ];
+  const anim = el.animate(frames, { duration: ms, fill: 'forwards' });
+
+  // 三次落地各噴一圈灰塵
+  [[.20, cw * .13], [.41, cw * .25], [.60, takeoff]].forEach(([t, x]) => {
+    setTimeout(() => puff(x, floor + size * .4, size), ms * t);
+  });
+  // 跳進去的瞬間整台機器晃一下
+  setTimeout(() => machine.classList.add('shake'), ms * .96);
+  setTimeout(() => machine.classList.remove('shake'), ms * .96 + 850);
+
+  // 保險：分頁在背景時瀏覽器會暫停動畫，anim.finished 可能永遠不完成，
+  // 所以加一個時間上限，時間到就直接收掉，抽獎流程不會卡住。
+  return Promise.race([anim.finished.catch(() => {}), sleep(ms + 600)])
+    .then(() => { try { anim.cancel(); } catch {} el.remove(); });
+}
+// 設定攪拌速度（中心 logo 的轉速也跟著同步）
+function setSpeed(dt) {
+  simDt = dt;
+  const hub = drum.querySelector('.hub');
+  if (hub) hub.style.animationDuration = (1.2 / Math.max(dt, 0.05)) + 's';
+}
+// 由快平滑減速到慢，球看起來像自己滾到停
+function easeSpeed(from, to, ms) {
+  return new Promise((done) => {
+    const t0 = performance.now();
+    const tick = () => {
+      const k = Math.min((performance.now() - t0) / Math.max(ms, 1), 1);
+      setSpeed(from + (to - from) * (1 - Math.pow(1 - k, 2)));
+      k < 1 ? requestAnimationFrame(tick) : done();
+    };
+    requestAnimationFrame(tick);
+  });
+}
 const REVEAL_DELAY = 3000; // 系所出現後，等幾毫秒再揭曉姓名
-function confetti() {
+
+// 中文一個字一個單位；英文以「單字」為單位（空白跟在單字後面），
+// 否則 Christopher Anderson 會變成一個字母一個字母出現，要跑十幾秒。
+function splitNameUnits(s) {
+  return String(s).match(/[A-Za-z0-9][A-Za-z0-9'’.\-]*\s*|\s+|[\s\S]/g) || [];
+}
+// 先量整串姓名的實際寬度，超出畫面就把字級等比例縮到塞得下為止
+function fitNameSize(nm, shown) {
+  const cv = $('#canvas');
+  if (!cv || !nm) return;
+  nm.style.fontSize = ''; // 先回到 --winner-size 再量
+  // 中文的字距（0.45em）套在英文上會把字母拉得太散、字級被迫縮很小，英文改用窄字距
+  const latin = !/[㐀-鿿豈-﫿]/.test(shown);
+  const sp = latin ? var_('--name-spacing-latin', '0.1em') : '';
+  nm.style.letterSpacing = sp;
+  nm.style.paddingLeft = sp;
+  const probe = document.createElement('span');
+  probe.textContent = shown;
+  probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;';
+  nm.appendChild(probe);
+  const w = probe.offsetWidth;           // 版面座標，不受整塊版面的 scale 影響
+  const base = parseFloat(getComputedStyle(nm).fontSize) || 0;
+  probe.remove();
+  const maxW = cv.offsetWidth * 0.84;    // 左右各留 8%，投影時不會貼到邊
+  if (w > maxW && base > 0) nm.style.fontSize = Math.floor(base * maxW / w) + 'px';
+}
+const var_ = (name, def) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || def;
+function confetti(n = 120) {
   const cols = ['#f7e3b0', '#d8ac5a', '#fff4d2', '#e0303a', '#ff6b6b', '#c9793f', '#ffffff'];
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < n; i++) {
     const c = document.createElement('div');
     c.className = 'confetti';
     c.style.left = Math.random() * 100 + '%';
     c.style.background = cols[i % cols.length];
     c.style.animationDuration = 2.2 + Math.random() * 2 + 's';
     c.style.animationDelay = Math.random() * .5 + 's';
-    c.style.borderRadius = Math.random() > .5 ? '50%' : '2px';
-    $('#stage').appendChild(c);
+    c.style.borderRadius = Math.random() > .5 ? '50%' : '4px';
+    $('#canvas').appendChild(c);
     setTimeout(() => c.remove(), 5000);
   }
+}
+// 中獎畫面期間持續灑花，直到下一輪開始（或回到抽獎前）
+let confettiTimer = 0;
+function startConfetti() {
+  stopConfetti();
+  confetti(120);
+  setTimeout(() => confetti(90), 450);
+  confettiTimer = setInterval(() => confetti(50), cssNum('--confetti-every-ms', 1200));
+}
+function stopConfetti() {
+  if (confettiTimer) { clearInterval(confettiTimer); confettiTimer = 0; }
 }
 
 $('#drawBtn').addEventListener('click', async () => {
   if (drawing) return;
   drawing = true;
   const btn = $('#drawBtn'); btn.disabled = true; btn.textContent = T('draw.drawing');
+  stopConfetti();
   $('#trayBall').classList.remove('show', 'waiting', 'hit'); $('#result').innerHTML = '';
   $('#reveal').classList.remove('show'); $('#stage').classList.remove('revealing');
-  // 攪拌與抽籤同時開始，按下後 5 秒內出現姓名；獎項以後台設定為準
-  simDt = Math.min(cssNum('--mix-speed', 0.3), 2);
-  drum.querySelector('.hub').style.animationDuration = (1.2 / simDt) + 's'; // 中心 logo 也跟著慢轉
+  // 攪拌與抽籤同時開始；獎項以後台設定為準
+  // 節奏：前段（--mix-duration）快速翻滾炒氣氛 → 再花 --mix-slowdown 平滑減速 → 球慢慢滾出來
+  const fastDt = Math.min(cssNum('--mix-speed-fast', 1.2), 2);
+  const slowDt = Math.min(cssNum('--mix-speed', 0.15), 2);
+  await introBall(); // 開場：球從畫面外彈跳進抽獎機，跳進去才開始攪拌
+  setSpeed(fastDt);
   mixing = true; drum.classList.add('spinning');
   let res;
   try {
     const req = DESIGN_PREVIEW
       ? Promise.resolve({ winner: { name: '王小明', dept: '新聞學系', formerName: '', prize: info.settings.prize }, remaining: Math.max(info.remaining - 1, 0) })
       : api('/api/admin/draw', { method: 'POST', body: {} });
-    [res] = await Promise.all([req, sleep(cssNum('--mix-duration', 3800))]);
+    [res] = await Promise.all([req, sleep(cssNum('--mix-duration', 8000))]);
+    await easeSpeed(fastDt, slowDt, cssNum('--mix-slowdown', 2200));
   } catch (err) { mixing = false; drum.classList.remove('spinning'); alert(err.message); drawing = false; render(); return; }
   mixing = false; drum.classList.remove('spinning');
   await sleep(200);
@@ -359,44 +597,51 @@ $('#drawBtn').addEventListener('click', async () => {
   if (pick) {
     pick.picked = true; pick.el.classList.add('picked');
     requestAnimationFrame(() => { pick.el.style.transform = `translate(${R - r}px, ${D + r}px)`; pick.el.style.opacity = '0'; });
-    await sleep(500);
+    await sleep(cssNum('--ball-out-ms', 4600) + 200); // 等球慢慢滾出去再揭曉
   }
   // 出獎第一段：畫面中上方先出現「恭喜抽中」與系所（同名時靠系所區分）
   const w = res.winner, shown = maskName(w.name);
   const nameEl = $('#trayName'), tray = $('#trayBall');
   nameEl.textContent = '？';
   nameEl.style.fontSize = 'calc(var(--size) * .11)';
+  centerTrayBall(); // 球停在版面正中央
   tray.classList.add('show', 'waiting');
-  await sleep(300);
+  // 「？」球慢慢掉下來並停留一下，之後揭曉層才蓋上來（蓋上後抽獎機會變暗）
+  await sleep(cssNum('--qball-in-ms', 1800) + cssNum('--qball-hold-ms', 2200));
   $('#result').innerHTML = `<div class="lbl">${esc(T('draw.congrats'))}</div>
     <div class="dept">${esc(w.dept || T('draw.deptEmpty'))}</div>
     <div class="nm-wrap"><div class="nm waiting"><span>•</span><span>•</span><span>•</span></div></div>`;
   $('#reveal').classList.add('show'); $('#stage').classList.add('revealing');
+  centerTrayBall(); // 揭曉時按鈕改成絕對定位、版面會位移，重算一次讓球維持在正中央
   await sleep(cssNum('--reveal-delay', REVEAL_DELAY));
 
-  // 第二段：姓名一個字一個字出現
-  const chars = [...shown];
+  // 第二段：姓名一個字一個字出現（英文以整個單字為單位，不會一個字母一個字母慢慢跑）
+  const chars = splitNameUnits(shown);
   const nm = $('#result .nm');
   nm.classList.remove('waiting');
   nm.innerHTML = '';
-  nm.style.fontSize = chars.length <= 4 ? '' : chars.length <= 8 ? 'calc(var(--winner-size) * .6)' : 'calc(var(--winner-size) * .4)';
+  fitNameSize(nm, shown); // 量實際寬度再決定字級，四個字或英文全名都塞得下
   nm.insertAdjacentHTML('beforebegin', '<div class="rays"></div>');
   const charDelay = cssNum('--name-char-delay', 650);
-  for (const c of chars) {
+  const surnameDelay = cssNum('--surname-delay', 3000); // 姓出現後先停一下，再接著出名字
+  for (let i = 0; i < chars.length; i++) {
+    const c = chars[i];
     const sp = document.createElement('span');
     sp.className = 'ch';
     sp.textContent = c === ' ' ? String.fromCharCode(160) : c;
     nm.appendChild(sp);
     const bu = document.createElement('div'); bu.className = 'burst'; nm.before(bu); setTimeout(() => bu.remove(), 1300);
-    await sleep(charDelay);
+    await sleep(i === 0 ? surnameDelay : charDelay);
   }
   nm.classList.add('done');
   nameEl.textContent = shown;
-  nameEl.style.fontSize = `calc(var(--size) * ${chars.length <= 3 ? .062 : chars.length <= 5 ? .048 : .034})`;
+  // 中獎球上的字要用「字元數」算（chars 是逐字顯示用的單位，英文一個單字算一個）
+  const len = [...shown].length;
+  nameEl.style.fontSize = `calc(var(--size) * ${len <= 3 ? .062 : len <= 5 ? .048 : len <= 10 ? .034 : len <= 16 ? .024 : .018})`;
   tray.classList.remove('waiting', 'show'); void tray.offsetWidth; tray.classList.add('show', 'hit');
   if (w.formerName && !info.settings.maskName) $('#result .nm-wrap').insertAdjacentHTML('afterend', `<div class="meta">（${esc(T('draw.former'))} ${esc(w.formerName)}）</div>`);
-  const fl = document.createElement('div'); fl.className = 'flash'; $('#stage').appendChild(fl); setTimeout(() => fl.remove(), 800);
-  confetti(); setTimeout(confetti, 450);
+  const fl = document.createElement('div'); fl.className = 'flash'; $('#canvas').appendChild(fl); setTimeout(() => fl.remove(), 800);
+  startConfetti();
   info.remaining = res.remaining;
   if (pick) { pick.el.remove(); balls = balls.filter((b) => b !== pick); }
   drawing = false;

@@ -10,7 +10,7 @@ const crypto = require('node:crypto');
 const DESIGN_SCHEMA = require('./design-defaults.js');
 const sso = require('./sso.js');
 
-const PORT = Number(process.env.PORT) || 8123;
+const PORT = Number(process.env.PORT) || 8124; // 預設 8124，避免和校友版（8123）搶同一個埠
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
