@@ -206,7 +206,7 @@
   <div class="brand"><img class="brand-logo" src="/brand/logo" data-asset="logo" alt="Logo"><span data-t="draw.brand">世新大學 70 週年</span></div>
   <div class="id-badge" data-t="draw.badge">在校生場　STUDENTS</div>
   <div class="top-actions" id="actions" hidden>
-    <button class="btn-ghost" id="fsBtn" title="投影用全螢幕">⛶ 全螢幕</button>
+    <button class="btn-ghost" id="fsBtn" title="投影用全螢幕（快捷鍵 F）">⛶ 全螢幕</button>
   </div>
 </header>
 
@@ -229,7 +229,7 @@
     </div>
     <div class="tray"><div class="tray-ball" id="trayBall"><span id="trayName"></span></div></div>
   </div>
-  <button class="btn-gold draw-btn" id="drawBtn">開始抽獎</button>
+  <button class="btn-gold draw-btn" id="drawBtn" title="快捷鍵：空白鍵／Enter／→／PageDown">開始抽獎</button>
   <span hidden data-t="draw.button">開始抽獎</span><span hidden data-t="draw.drawing">抽獎中…</span><span hidden data-t="draw.allDone">全部抽完了</span><span hidden data-t="draw.congrats">恭喜抽中</span><span hidden data-t="draw.former">原名</span>
   <div class="reveal" id="reveal" aria-live="polite"><div class="reveal-inner" id="result"></div></div>
  </div>
@@ -262,7 +262,29 @@ $('#loginForm').addEventListener('submit', async (e) => {
   try { await api('/api/admin/login', { method: 'POST', body: { password: $('#pw').value } }); $('#loginCard').hidden = true; load(); }
   catch (err) { const b = $('#loginErr'); b.textContent = err.message; b.hidden = false; }
 });
-$('#fsBtn').addEventListener('click', () => { document.fullscreenElement ? document.exitFullscreen() : $('#stage').requestFullscreen?.(); });
+function toggleFullscreen() { document.fullscreenElement ? document.exitFullscreen() : $('#stage').requestFullscreen?.(); }
+$('#fsBtn').addEventListener('click', toggleFullscreen);
+
+// ---------- 鍵盤／簡報筆快捷鍵 ----------
+// 空白鍵、Enter、→、PageDown 都可以抽獎（一般簡報筆的「下一頁」送的就是這幾個鍵），
+// F 切換全螢幕。在登入密碼欄位打字時不會被攔截。
+// 同時看 e.code 與 e.key：有些簡報筆／遠端桌面送出的事件 e.key 會是空字串
+const DRAW_KEYS = [' ', 'Spacebar', 'Enter', 'ArrowRight', 'PageDown'];
+const DRAW_CODES = ['Space', 'Enter', 'NumpadEnter', 'ArrowRight', 'PageDown'];
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if ($('#stage').hidden) return;
+  if (DRAW_CODES.includes(e.code) || DRAW_KEYS.includes(e.key)) {
+    e.preventDefault(); // 擋掉空白鍵捲動頁面，也避免按鈕被原生觸發造成抽兩次
+    const btn = $('#drawBtn');
+    if (!drawing && !btn.disabled) btn.click();
+  } else if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {
+    e.preventDefault();
+    toggleFullscreen();
+  }
+});
 
 // 固定版面（預設 4096x2048）整塊等比例縮到實際螢幕，構圖在任何螢幕上都一樣。
 // 螢幕比例和版面接近時（例如 16:9）直接放大到填滿、上下切掉一點點留白；
