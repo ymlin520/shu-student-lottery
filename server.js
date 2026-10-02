@@ -13,6 +13,8 @@ const sso = require('./sso.js');
 const PORT = Number(process.env.PORT) || 8124; // 預設 8124，避免和校友版（8123）搶同一個埠
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
+// 另一場的資料夾（抽獎畫面按 Q／A 切過去用）
+const SIBLING_DIR = process.env.SIBLING_DIR || path.join(ROOT, '..', 'shu-alumni-lottery');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const PW_FILE = path.join(ROOT, 'admin-password.txt');
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads'); // 設計後台上傳的圖片（不進版控）
@@ -29,7 +31,7 @@ if (!ADMIN_PASSWORD) {
 }
 
 // ---------- 資料 ----------
-const EMPTY = { settings: { title: '世新大學在校生抽獎活動', open: true, maskName: false, prize: '' }, design: { vars: {}, texts: {}, customCss: '', assets: {} }, entries: [], winners: [] };
+const EMPTY = { settings: { title: '世新大學在校生抽獎活動', open: true, maskName: false, prize: '', showFsBtn: false }, design: { vars: {}, texts: {}, customCss: '', assets: {} }, entries: [], winners: [] };
 let db = EMPTY;
 if (fs.existsSync(DB_FILE)) {
   try { const saved = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); db = { ...EMPTY, ...saved, settings: { ...EMPTY.settings, ...saved.settings }, design: { ...EMPTY.design, assets: {}, ...saved.design } }; } catch (e) { console.error('db.json 讀取失敗，另存備份', e); fs.copyFileSync(DB_FILE, DB_FILE + '.broken-' + Date.now()); }
@@ -134,6 +136,17 @@ function designHead() {
     + `<script>window.__DESIGN__=JSON.parse(decodeURIComponent("${encodeURIComponent(JSON.stringify(d))}"));</script>`;
 }
 
+// 從另一場的 tunnel.log 讀出它「目前」的 Cloudflare 臨時網址
+// （臨時網址每次重開都會變，寫死在設定裡會失效）
+function siblingDrawUrl() {
+  try {
+    const txt = fs.readFileSync(path.join(SIBLING_DIR, 'data', 'tunnel.log'), 'utf8');
+    const all = txt.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/g);
+    if (all && all.length) return all[all.length - 1] + '/draw';
+  } catch {}
+  return null;
+}
+
 // ---------- 設計後台上傳的圖片 ----------
 const ASSET_SLOTS = Object.fromEntries(DESIGN_SCHEMA.assets.map((a) => [a.key, a]));
 const BLANK_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
@@ -185,7 +198,7 @@ function cleanupUploads() {
 }
 
 // ---------- 靜態檔 ----------
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.ico': 'image/x-icon' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.ico': 'image/x-icon', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav' };
 function serveStatic(req, res, file) {
   const p = path.join(ROOT, 'public', file);
   if (!p.startsWith(path.join(ROOT, 'public'))) return send(res, 403, { error: 'forbidden' });
@@ -324,6 +337,7 @@ async function handle(req, res) {
         remaining: remaining().length,
       });
     }
+    if (m === 'GET' && p === '/api/admin/switch-url') return send(res, 200, { url: siblingDrawUrl() });
     if (m === 'GET' && p === '/api/admin/draw-info') {
       return send(res, 200, { settings: db.settings, remaining: remaining().length });
     }
@@ -366,6 +380,7 @@ async function handle(req, res) {
       const b = await readBody(req).catch(() => ({}));
       if (typeof b.open === 'boolean') db.settings.open = b.open;
       if (typeof b.maskName === 'boolean') db.settings.maskName = b.maskName;
+      if (typeof b.showFsBtn === 'boolean') db.settings.showFsBtn = b.showFsBtn;
       if (typeof b.title === 'string' && b.title.trim()) db.settings.title = clean(b.title, 60);
       if (typeof b.prize === 'string') db.settings.prize = clean(b.prize, 30); // 可留空
       save(); return send(res, 200, { ok: true, settings: db.settings });

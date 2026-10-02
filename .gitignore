@@ -16,3 +16,6 @@ Thumbs.db
 desktop.ini
 
 auto-push.log
+
+# ElevenLabs 音效產生器的 API 金鑰
+elevenlabs-key.txt

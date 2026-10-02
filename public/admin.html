@@ -100,6 +100,7 @@
       <div class="grid3" style="align-items:end">
         <div class="field" style="margin:0"><label for="prize">本輪獎項<span class="opt">選填</span></label><input class="input" id="prize" maxlength="30" placeholder="留空就不標獎項（例：頭獎、二獎）"></div>
         <label class="switch"><span>投影時遮蔽姓名中間字</span><input type="checkbox" id="maskName"></label>
+        <label class="switch"><span>抽獎畫面顯示「全螢幕」按鈕<small>（關閉後仍可按 F 鍵全螢幕、Esc 離開）</small></span><input type="checkbox" id="showFsBtn"></label>
         <label class="switch"><span>開放學生報名</span><input type="checkbox" id="openReg"></label>
       </div>
       <div class="save-row">
@@ -327,6 +328,7 @@ let settingsDirty = false;
 function fillSettings() {
   $('#prize').value = state.settings.prize || '';
   $('#maskName').checked = state.settings.maskName;
+  $('#showFsBtn').checked = !!state.settings.showFsBtn;
   $('#openReg').checked = state.settings.open;
 }
 function markDirty(on) {
@@ -336,13 +338,13 @@ function markDirty(on) {
   $('#settingsHint').textContent = on ? '有尚未儲存的變更' : '';
   $('#settingsHint').style.color = on ? 'var(--gold-hi)' : '';
 }
-['#prize', '#maskName', '#openReg'].forEach((id) => $(id).addEventListener('input', () => markDirty(true)));
-['#maskName', '#openReg'].forEach((id) => $(id).addEventListener('change', () => markDirty(true)));
+['#prize', '#maskName', '#showFsBtn', '#openReg'].forEach((id) => $(id).addEventListener('input', () => markDirty(true)));
+['#maskName', '#showFsBtn', '#openReg'].forEach((id) => $(id).addEventListener('change', () => markDirty(true)));
 $('#cancelSettings').addEventListener('click', () => { fillSettings(); markDirty(false); });
 $('#saveSettings').addEventListener('click', async () => {
   const btn = $('#saveSettings'); btn.disabled = true; btn.textContent = '儲存中…';
   try {
-    state.settings = (await api('/api/admin/settings', { method: 'POST', body: { prize: $('#prize').value.trim(), maskName: $('#maskName').checked, open: $('#openReg').checked } })).settings;
+    state.settings = (await api('/api/admin/settings', { method: 'POST', body: { prize: $('#prize').value.trim(), maskName: $('#maskName').checked, showFsBtn: $('#showFsBtn').checked, open: $('#openReg').checked } })).settings;
     fillSettings(); markDirty(false);
     $('#settingsHint').textContent = '✓ 已儲存（' + new Date().toLocaleTimeString('zh-TW', { hour12: false }) + '）';
     $('#settingsHint').style.color = 'var(--ok)';

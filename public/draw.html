@@ -30,10 +30,9 @@
      這樣 header 和抽獎區才是同一張背景、不會有接縫，裝飾圖的取景也跟其他頁一致。
      只有全螢幕時舞台蓋住整個畫面、看不到 body，才需要自己補一份背景。 */
   .stage { position: fixed; left: 0; right: 0; top: var(--topbar-h, 66px); bottom: 0; z-index: 1; overflow: hidden; }
-  .stage:fullscreen { top: 0;
-    background: var(--bg-deco, url(/brand/bg)) center / cover no-repeat,
-                radial-gradient(900px 560px at 50% 32%, var(--glow1) 0%, transparent 70%),
-                linear-gradient(180deg, var(--bg), var(--bg2)); }
+  /* 全螢幕是整頁進入，頂端列照常顯示，舞台一樣從頂端列下方開始，不需要另外補背景 */
+  /* 進入全螢幕後就不需要這顆按鈕了，要離開按 Esc 或 F */
+  :fullscreen #fsBtn { display: none !important; }
   .canvas {
     position: absolute; left: 50%; top: 50%;
     width: var(--stage-w, 4096px); height: var(--stage-h, 2048px);
@@ -91,7 +90,7 @@
     box-shadow: inset -17px -21px 38px rgba(0,0,0,.25), 0 26px 51px rgba(0,0,0,.4), 0 0 0 9px rgba(255,255,255,.15);
   }
   .tray-ball span { color: var(--btn-text); font-weight: 900; font-family: var(--font-display); padding: 0 10%; line-height: 1.15; word-break: break-all; position: relative; z-index: 1; }
-  /* 「？」球與中獎球掉進承接槽的速度，由 --qball-in-ms 控制 */
+  /* 中獎球掉進承接槽的速度，由 --qball-in-ms 控制 */
   .tray-ball.show { transform: translateX(-50%) translateY(var(--tray-ball-dy, 0px)) scale(1);
     animation: trayDrop calc(var(--qball-in-ms, 1800) * 1ms) cubic-bezier(.25,1.25,.45,1); }
   /* 球從中央 70 logo 的位置冒出來（-115% 剛好是球槽圓心），由小變大，停在畫面正中央。
@@ -127,6 +126,12 @@
     84% { transform: translate(-.4%, .3%) rotate(-.3deg); }
   }
   .machine.shake { animation: machineShake .8s cubic-bezier(.36, .07, .19, .97); }
+  /* 切換靜音時的提示（不在縮放版面裡，用真實 px） */
+  .toast { position: fixed; left: 50%; bottom: 7%; transform: translateX(-50%) translateY(8px); z-index: 60;
+    padding: 12px 26px; border-radius: 999px; font-size: 22px; font-weight: 700; letter-spacing: .1em;
+    color: var(--text); background: rgba(20, 0, 2, .82); border: 1px solid var(--line);
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   /* 按鈕的框也要跟著字一起放大（theme.css 的 padding 是給一般頁面的 20px 字用的） */
   .draw-btn { margin: calc(2 * var(--vh)) auto 0; width: min(1260px, 88%); display: block;
     font-size: var(--draw-btn-size, 82px); padding: calc(2.3 * var(--vh)) calc(3.6 * var(--vw));
@@ -206,7 +211,7 @@
   <div class="brand"><img class="brand-logo" src="/brand/logo" data-asset="logo" alt="Logo"><span data-t="draw.brand">世新大學 70 週年</span></div>
   <div class="id-badge" data-t="draw.badge">在校生場　STUDENTS</div>
   <div class="top-actions" id="actions" hidden>
-    <button class="btn-ghost" id="fsBtn" title="投影用全螢幕（快捷鍵 F）">⛶ 全螢幕</button>
+    <button class="btn-ghost" id="fsBtn" title="投影用全螢幕（快捷鍵 F，離開按 Esc）">⛶ 全螢幕</button>
   </div>
 </header>
 
@@ -262,7 +267,8 @@ $('#loginForm').addEventListener('submit', async (e) => {
   try { await api('/api/admin/login', { method: 'POST', body: { password: $('#pw').value } }); $('#loginCard').hidden = true; load(); }
   catch (err) { const b = $('#loginErr'); b.textContent = err.message; b.hidden = false; }
 });
-function toggleFullscreen() { document.fullscreenElement ? document.exitFullscreen() : $('#stage').requestFullscreen?.(); }
+// 整頁進入全螢幕（不是只有舞台），這樣頂端的 Logo 與身分標籤在全螢幕時還看得到
+function toggleFullscreen() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); }
 $('#fsBtn').addEventListener('click', toggleFullscreen);
 
 // ---------- 鍵盤／簡報筆快捷鍵 ----------
@@ -283,6 +289,12 @@ document.addEventListener('keydown', (e) => {
   } else if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {
     e.preventDefault();
     toggleFullscreen();
+  } else if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M') {
+    e.preventDefault();
+    toggleSfx();
+  } else if (e.code === 'KeyQ' || e.code === 'KeyA' || /^[qaQA]$/.test(e.key)) {
+    e.preventDefault();
+    switchScene();
   }
 });
 
@@ -330,6 +342,8 @@ async function load() {
   render();
 }
 function render() {
+  // 「全螢幕」按鈕預設不顯示，可在後台「抽獎設定」打開（關閉時仍可按 F 鍵全螢幕）
+  $('#fsBtn').hidden = !info?.settings?.showFsBtn;
   if (!drawing) {
     buildBalls(info.remaining);
     $('#drawBtn').disabled = info.remaining === 0;
@@ -357,6 +371,150 @@ document.addEventListener('previewview', (e) => {
   }
 });
 setInterval(() => { if (!DESIGN_PREVIEW && !drawing && !$('#stage').hidden) api('/api/admin/draw-info').then((d) => { info = d; render(); }).catch(() => {}); }, 4000);
+
+// ---------- 音效 ----------
+// 素材只有一個檔（/assets/win-chime.mp3，4 秒、三段上行鈴聲＋尾韻），
+// 用「切片＋變速」從同一個檔延伸出抽獎各階段的聲音：
+//   0.00–0.60s 第一聲、0.75–1.40s 第二聲、1.50–2.20s 第三聲、2.2s 之後是尾韻
+let actx = null, sfxBus = null;
+const SFX_FILES = { chime: '/assets/win-chime.mp3', spin: '/assets/spin-build.mp3' };
+const sfxBuf = {}, sfxReq = {};
+let sfxOn = localStorage.getItem('sfxOff') !== '1';
+function audio() {
+  if (!actx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    try { actx = new AC(); } catch { return null; }
+    sfxBus = actx.createGain();     // 所有聲音都走這條主匯流排，方便統一控制與量測
+    sfxBus.gain.value = 1;
+    sfxBus.connect(actx.destination);
+  }
+  if (actx.state === 'suspended') actx.resume().catch(() => {});
+  return actx;
+}
+// 全域音高倍率：讓校友場與在校生場用同一組素材也能有不同個性
+function sfxPitch() {
+  const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sfx-pitch'));
+  return Number.isFinite(v) && v > 0 ? Math.min(Math.max(v, 0.5), 2) : 1;
+}
+function sfxVol() {
+  if (!sfxOn) return 0;
+  const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sfx-volume'));
+  return Number.isFinite(v) ? Math.min(Math.max(v, 0), 1) : 0.8;
+}
+function loadSfx(name) {
+  const a = audio();
+  if (!a) return Promise.resolve(null);
+  if (sfxBuf[name]) return Promise.resolve(sfxBuf[name]);
+  if (!sfxReq[name]) {
+    sfxReq[name] = fetch(SFX_FILES[name])
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('載入失敗'))))
+      .then((b) => a.decodeAudioData(b))
+      .then((buf) => (sfxBuf[name] = buf))
+      .catch(() => null);
+  }
+  return sfxReq[name];
+}
+const loadChime = () => Promise.all(Object.keys(SFX_FILES).map(loadSfx));
+// 從素材裡切一段出來播：offset 起點秒、dur 長度秒（0＝播到底）、rate 音高、vol 音量
+function play(name, { offset = 0, dur = 0, rate = 1, vol = 1, fade = 0.15 } = {}) {
+  const a = audio(), buf = sfxBuf[name], v = vol * sfxVol();
+  if (!a || !buf || v <= 0) return;
+  const len = Math.max(0.02, dur || (buf.duration - offset));
+  const src = a.createBufferSource();
+  src.buffer = buf;
+  rate *= sfxPitch();
+  src.playbackRate.value = rate;
+  const g = a.createGain(), t = a.currentTime, real = len / rate;
+  g.gain.setValueAtTime(v, t);
+  if (real > fade) { // 切片結尾淡出，避免「喀」的爆音
+    g.gain.setValueAtTime(v, t + real - fade);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + real);
+  }
+  src.connect(g).connect(sfxBus || a.destination);
+  try { src.start(t, offset, len); } catch {}
+}
+// win-chime：0.00–0.60 第一聲、0.75–1.40 第二聲、1.50–2.20 第三聲、之後尾韻
+const sfxBounce = () => play('chime', { offset: 0, dur: 0.16, rate: 1.7 + Math.random() * 0.3, vol: 0.4 }); // 開場球落地
+const sfxIntoDrum = () => play('chime', { offset: 1.5, dur: 0.8, rate: 0.85, vol: 0.7 });                   // 跳進抽獎機
+const sfxBallOut = () => play('chime', { offset: 0.75, dur: 0.6, rate: 0.75, vol: 0.35 });                  // 中獎球滾出來
+// 揭曉階段（恭喜抽中／系所／姓名）刻意不配音效，讓畫面安靜收尾
+
+// 攪拌中的轉動聲：spin-build 素材 0–3.4 秒是醞釀中的旋轉，3.5 秒是高潮撞擊。
+// 旋轉段取 1.0–3.0 秒（音量最平穩的區段）循環播放，停止攪拌時再放高潮那一下。
+let spinSrc = null, spinGain = null, clackTimer = 0;
+function startRollSound() {
+  stopRollSound(true);
+  const a = audio(), v = sfxVol();
+  if (!a || !sfxBuf.spin || v <= 0 || !mixing) return;
+  const src = a.createBufferSource();
+  src.buffer = sfxBuf.spin;
+  src.loop = true; src.loopStart = 1.0; src.loopEnd = 3.0;
+  src.playbackRate.value = sfxPitch();
+  const g = a.createGain();
+  g.gain.setValueAtTime(0.0001, a.currentTime);
+  src.connect(g).connect(sfxBus);
+  try { src.start(a.currentTime, 0); } catch {}
+  g.gain.linearRampToValueAtTime(0.9 * v, a.currentTime + 0.6);
+  spinSrc = src; spinGain = g;
+  clack();
+}
+function clack() {
+  if (!mixing) return;
+  // 切得太短、音調拉太高會變成聽不見的「嘶」聲，要留一點長度與實體感
+  play('chime', { offset: 0.015, dur: 0.17, rate: 1.5 + Math.random() * 1.1, vol: 0.4 + Math.random() * 0.22, fade: 0.03 });
+  clackTimer = setTimeout(clack, (90 + Math.random() * 90) / Math.max(simDt, 0.12));
+}
+// quiet = true 代表只是重設，不要放高潮那一下
+function stopRollSound(quiet) {
+  if (clackTimer) { clearTimeout(clackTimer); clackTimer = 0; }
+  const a = audio();
+  if (spinSrc && a) {
+    const src = spinSrc, g = spinGain;
+    try {
+      g.gain.cancelScheduledValues(a.currentTime);
+      g.gain.setValueAtTime(g.gain.value, a.currentTime);
+      g.gain.linearRampToValueAtTime(0.0001, a.currentTime + 0.35);
+      src.stop(a.currentTime + 0.45);
+    } catch {}
+  }
+  spinSrc = null; spinGain = null;
+  if (!quiet) play('spin', { offset: 3.0, dur: 1.6, vol: 0.95, fade: 0.4 }); // 轉動結束的高潮撞擊
+}
+
+// Q／A：切換到另一場的抽獎畫面（網址在設計後台「抽獎頁」設定）
+async function switchScene() {
+  if (drawing) return toast('抽獎進行中，先抽完再切換'); // 防誤觸
+  let url = (window.T ? T('draw.switchUrl') : '').trim();
+  // 現在不是用本機位址在看（例如用 Cloudflare 臨時網址投影），就改切到對方「目前」的臨時網址。
+  // 臨時網址每次重開都會變，所以跟伺服器要即時的，不用手動維護。
+  if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+    try {
+      const d = await fetch('/api/admin/switch-url').then((r) => r.json());
+      if (d && d.url) url = d.url;
+    } catch {}
+  }
+  if (!url) return toast('還沒設定另一場的網址（設計後台 →「抽獎頁」）');
+  toast(T('draw.switchLabel') || '切換中…');
+  setTimeout(() => { location.href = url; }, 250);
+}
+
+// 靜音切換（M 鍵）：記在這台電腦的瀏覽器裡
+function toggleSfx() {
+  sfxOn = !sfxOn;
+  try { localStorage.setItem('sfxOff', sfxOn ? '0' : '1'); } catch {}
+  toast(sfxOn ? '🔊 音效開' : '🔇 音效關');
+  if (sfxOn) { loadChime().then(() => play('chime', { offset: 0, dur: 0.4, rate: 1.3, vol: 0.5 })); }
+}
+let toastTimer = 0;
+function toast(msg) {
+  let el = $('#toast');
+  if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; document.body.appendChild(el); }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1400);
+}
 
 // ---------- 彩球物理 ----------
 const COLORS = ['c-gold', 'c-teal', 'c-pink', 'c-green', 'c-purple'];
@@ -505,10 +663,10 @@ function introBall() {
 
   // 三次落地各噴一圈灰塵
   [[.20, cw * .13], [.41, cw * .25], [.60, takeoff]].forEach(([t, x]) => {
-    setTimeout(() => puff(x, floor + size * .4, size), ms * t);
+    setTimeout(() => { puff(x, floor + size * .4, size); sfxBounce(); }, ms * t);
   });
   // 跳進去的瞬間整台機器晃一下
-  setTimeout(() => machine.classList.add('shake'), ms * .96);
+  setTimeout(() => { machine.classList.add('shake'); sfxIntoDrum(); }, ms * .96);
   setTimeout(() => machine.classList.remove('shake'), ms * .96 + 850);
 
   // 保險：分頁在背景時瀏覽器會暫停動畫，anim.finished 可能永遠不完成，
@@ -592,6 +750,7 @@ $('#drawBtn').addEventListener('click', async () => {
   if (drawing) return;
   drawing = true;
   const btn = $('#drawBtn'); btn.disabled = true; btn.textContent = T('draw.drawing');
+  loadChime(); // 使用者按下的這一下才能解鎖瀏覽器的音訊播放
   stopConfetti();
   $('#trayBall').classList.remove('show', 'waiting', 'hit'); $('#result').innerHTML = '';
   $('#reveal').classList.remove('show'); $('#stage').classList.remove('revealing');
@@ -602,6 +761,7 @@ $('#drawBtn').addEventListener('click', async () => {
   await introBall(); // 開場：球從畫面外彈跳進抽獎機，跳進去才開始攪拌
   setSpeed(fastDt);
   mixing = true; drum.classList.add('spinning');
+  loadChime().then(startRollSound); // 球開始滾＝滾動聲與碰撞聲
   let res;
   try {
     const req = DESIGN_PREVIEW
@@ -609,8 +769,8 @@ $('#drawBtn').addEventListener('click', async () => {
       : api('/api/admin/draw', { method: 'POST', body: {} });
     [res] = await Promise.all([req, sleep(cssNum('--mix-duration', 8000))]);
     await easeSpeed(fastDt, slowDt, cssNum('--mix-slowdown', 2200));
-  } catch (err) { mixing = false; drum.classList.remove('spinning'); alert(err.message); drawing = false; render(); return; }
-  mixing = false; drum.classList.remove('spinning');
+  } catch (err) { mixing = false; drum.classList.remove('spinning'); stopRollSound(); alert(err.message); drawing = false; render(); return; }
+  mixing = false; drum.classList.remove('spinning'); stopRollSound();
   await sleep(200);
   // 最靠近出口的球掉出去
   const { D, R, r } = dims();
@@ -619,17 +779,13 @@ $('#drawBtn').addEventListener('click', async () => {
   if (pick) {
     pick.picked = true; pick.el.classList.add('picked');
     requestAnimationFrame(() => { pick.el.style.transform = `translate(${R - r}px, ${D + r}px)`; pick.el.style.opacity = '0'; });
+    sfxBallOut();
     await sleep(cssNum('--ball-out-ms', 4600) + 200); // 等球慢慢滾出去再揭曉
   }
   // 出獎第一段：畫面中上方先出現「恭喜抽中」與系所（同名時靠系所區分）
   const w = res.winner, shown = maskName(w.name);
   const nameEl = $('#trayName'), tray = $('#trayBall');
-  nameEl.textContent = '？';
-  nameEl.style.fontSize = 'calc(var(--size) * .11)';
-  centerTrayBall(); // 球停在版面正中央
-  tray.classList.add('show', 'waiting');
-  // 「？」球慢慢掉下來並停留一下，之後揭曉層才蓋上來（蓋上後抽獎機會變暗）
-  await sleep(cssNum('--qball-in-ms', 1800) + cssNum('--qball-hold-ms', 2200));
+  // 不顯示「？」球，中獎球滾出來之後直接進揭曉畫面
   $('#result').innerHTML = `<div class="lbl">${esc(T('draw.congrats'))}</div>
     <div class="dept">${esc(w.dept || T('draw.deptEmpty'))}</div>
     <div class="nm-wrap"><div class="nm waiting"><span>•</span><span>•</span><span>•</span></div></div>`;
@@ -650,7 +806,8 @@ $('#drawBtn').addEventListener('click', async () => {
     const c = chars[i];
     const sp = document.createElement('span');
     sp.className = 'ch';
-    sp.textContent = c === ' ' ? String.fromCharCode(160) : c;
+    // 空白要換成不斷行空白：每個單位是 inline-block，尾端的一般空白會被瀏覽器吃掉
+    sp.textContent = c.replace(/ /g, String.fromCharCode(160));
     nm.appendChild(sp);
     const bu = document.createElement('div'); bu.className = 'burst'; nm.before(bu); setTimeout(() => bu.remove(), 1300);
     await sleep(i === 0 ? surnameDelay : charDelay);
