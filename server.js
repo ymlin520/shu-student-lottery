@@ -8,7 +8,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const DESIGN_SCHEMA = require('./design-defaults.js');
-const sso = require('./sso.js');
 
 const PORT = Number(process.env.PORT) || 8124; // 預設 8124，避免和校友版（8123）搶同一個埠
 const ROOT = __dirname;
@@ -31,19 +30,71 @@ if (!ADMIN_PASSWORD) {
 }
 
 // ---------- 資料 ----------
-const EMPTY = { settings: { title: '世新大學在校生抽獎活動', open: true, maskName: false, prize: '', showFsBtn: false }, design: { vars: {}, texts: {}, customCss: '', assets: {} }, entries: [], winners: [] };
+const EMPTY = { settings: { title: '世新大學在校生抽獎活動', open: true, maskName: false, prize: '', showFsBtn: false }, design: { vars: {}, texts: {}, customCss: '', assets: {} }, entries: [], winners: [], roster: [], rosterImportedAt: null };
 let db = EMPTY;
 if (fs.existsSync(DB_FILE)) {
-  try { const saved = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); db = { ...EMPTY, ...saved, settings: { ...EMPTY.settings, ...saved.settings }, design: { ...EMPTY.design, assets: {}, ...saved.design } }; } catch (e) { console.error('db.json 讀取失敗，另存備份', e); fs.copyFileSync(DB_FILE, DB_FILE + '.broken-' + Date.now()); }
+  try { const saved = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); db = { ...EMPTY, ...saved, settings: { ...EMPTY.settings, ...saved.settings }, design: { ...EMPTY.design, assets: {}, ...saved.design }, roster: saved.roster || [] }; } catch (e) { console.error('db.json 讀取失敗，另存備份', e); fs.copyFileSync(DB_FILE, DB_FILE + '.broken-' + Date.now()); }
 }
-function save() {
+// 寫檔：整份 db.json 有 1 MB 以上，現場排隊報到時每個人都整份重寫會塞住，
+// 所以把 200 毫秒內的多次變更合併成一次寫入；關掉程式前一定會補寫，資料不會少。
+let saveTimer = null, savePending = false;
+function writeNow() {
   const tmp = DB_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
   fs.renameSync(tmp, DB_FILE);
+  // db.json 已經包含全部內容，日誌可以清掉
+  try { if (fs.existsSync(JOURNAL) && fs.statSync(JOURNAL).size) fs.writeFileSync(JOURNAL, ''); } catch {}
 }
+// save()：後台操作等等要馬上落地，直接寫。
+// save(true)：現場報到用，允許延後 200 毫秒合併寫，期間靠報到日誌保命。
+function save(deferred) {
+  if (!deferred) {
+    savePending = false;
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    return writeNow();
+  }
+  savePending = true;
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    if (savePending) { savePending = false; writeNow(); }
+  }, 200);
+}
+// ---------- 報到日誌（斷電／強制關閉的保險） ----------
+// 報到當下只 append 一行（幾十位元組），很快；db.json 寫成功後日誌就清空。
+const JOURNAL = path.join(DATA_DIR, 'checkin-journal.log');
+function journal(entry) {
+  try { fs.appendFileSync(JOURNAL, JSON.stringify(entry) + '\n'); } catch (e) { console.error('報到日誌寫入失敗', e); }
+}
+function replayJournal() {
+  if (!fs.existsSync(JOURNAL)) return;
+  let text = '';
+  try { text = fs.readFileSync(JOURNAL, 'utf8'); } catch { return; }
+  let n = 0;
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const r = JSON.parse(line);
+      const e = db.entries.find((x) => x.id === r.id);
+      if (e) { if (!e.registered) { Object.assign(e, r); n++; } } else { db.entries.push(r); n++; }
+    } catch {}
+  }
+  if (n) { console.log(`[復原] 從報到日誌補回 ${n} 筆報到紀錄`); writeNow(); }
+  else { try { fs.writeFileSync(JOURNAL, ''); } catch {} }
+}
+function flushSave() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  if (savePending) { savePending = false; try { writeNow(); } catch (e) { console.error('關閉前寫檔失敗', e); } }
+}
+process.on('exit', flushSave);
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) {
+  process.on(sig, () => { flushSave(); process.exit(0); });
+}
+replayJournal(); // 上次若被強制關掉，把日誌裡還沒寫進 db.json 的報到補回來
 
 // ---------- 驗證 ----------
 const validStudentNo = (v) => /^[A-Z0-9-]{4,20}$/.test(v);
+const normName = (v) => clean(v, 40).replace(/[\s　]/g, ''); // 比對姓名用：忽略全形／半形空白
 const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, max);
 
 // ---------- 工具 ----------
@@ -60,10 +111,10 @@ function send(res, code, obj, headers = {}) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
   res.end(JSON.stringify(obj));
 }
-function readBody(req) {
+function readBody(req, max = 120_000) {
   return new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
-    req.on('data', (c) => { size += c.length; if (size > 120_000) { reject(new Error('too large')); req.destroy(); } else chunks.push(c); });
+    req.on('data', (c) => { size += c.length; if (size > max) { reject(new Error('too large')); req.destroy(); } else chunks.push(c); });
     req.on('end', () => { try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {}); } catch { reject(new Error('bad json')); } });
     req.on('error', reject);
   });
@@ -93,7 +144,8 @@ const clientIp = (req) => req.headers['cf-connecting-ip'] || req.socket.remoteAd
 
 const publicEntry = (e, winnerSet) => ({
   id: e.id, no: e.no, name: e.name, studentNo: e.studentNo, dept: e.dept,
-  className: e.className, email: e.email, source: e.source, addedBy: e.addedBy,
+  className: e.className, email: e.email, phone: e.phone, rosterNote: e.rosterNote,
+  source: e.source, addedBy: e.addedBy,
   createdAt: e.createdAt, lastLoginAt: e.lastLoginAt, won: winnerSet.has(e.id),
 });
 function parseStudent(b, selfId) {
@@ -102,17 +154,20 @@ function parseStudent(b, selfId) {
   const dept = clean(b.dept, 60);
   const className = clean(b.className, 40);
   const email = clean(b.email, 80);
+  const phone = clean(b.phone, 30);
   if (!validStudentNo(studentNo)) return { error: '學號格式不正確（4–20 碼英數字）。', field: 'studentNo' };
   if (!name) return { error: '請填寫姓名。', field: 'name' };
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: 'Email 格式不正確。', field: 'email' };
   const dup = db.entries.find((e) => e.studentNo === studentNo && e.id !== selfId);
   if (dup) return { code: 409, error: `學號 ${studentNo} 已經報名過了（報名編號 ${dup.no}），每位學生限報名一次。`, field: 'studentNo' };
-  return { data: { studentNo, name, dept, className, email } };
+  return { data: { studentNo, name, dept, className, email, phone } };
 }
-function addEntry(data) {
+function addEntry(data, deferred) {
   const no = 'S' + String(db.entries.reduce((mx, e) => Math.max(mx, Number(e.no.slice(1))), 0) + 1).padStart(4, '0');
   const entry = { id: crypto.randomUUID(), no, ...data, createdAt: new Date().toISOString() };
-  db.entries.push(entry); save();
+  db.entries.push(entry);
+  if (deferred) journal(entry); // 現場報名：先寫一行日誌，整份 db.json 稍後合併寫
+  save(deferred);
   return entry;
 }
 function remaining() {
@@ -210,48 +265,36 @@ function serveStatic(req, res, file) {
   });
 }
 
-// ---------- SSO 登入流程（/api/login 與 /sso/accept 共用）----------
-const ssoResults = new Map(); // 一次性登入結果，給導轉回來的頁面取用
-function readForm(req) {
-  return new Promise((resolve, reject) => {
-    let size = 0; const chunks = [];
-    req.on('data', (c) => { size += c.length; if (size > 20_000) { reject(new Error('too large')); req.destroy(); } else chunks.push(c); });
-    req.on('end', () => {
-      const out = {};
-      for (const [k, v] of new URLSearchParams(Buffer.concat(chunks).toString('utf8'))) out[k] = v;
-      resolve(out);
-    });
-    req.on('error', reject);
-  });
-}
-async function ssoLogin(account, secret) {
+// ---------- 報名登記：學號＋姓名比對在校生名單 ----------
+function rosterLogin(studentNoRaw, nameRaw) {
   if (!db.settings.open) return { code: 403, body: { error: '本次報名已截止，感謝您的參與。' } };
-  if (!account) return { code: 400, body: { error: '請輸入學號或帳號。', field: 'account' } };
-  if (!secret) return { code: 400, body: { error: '請輸入密碼。', field: 'password' } };
+  const studentNo = clean(studentNoRaw, 20).toUpperCase().replace(/\s/g, '');
+  const name = clean(nameRaw, 40);
+  if (!studentNo) return { code: 400, body: { error: '請輸入學號。', field: 'account' } };
+  if (!name) return { code: 400, body: { error: '請輸入姓名。', field: 'name' } };
 
-  let r;
-  try { r = await sso.verify(account, secret); }
-  catch (e) { console.error('SSO 錯誤', e.message); r = { ok: false, error: '認證系統忙碌中，請稍後再試。' }; }
-  if (!r.ok) {
-    console.log(`[登入失敗] ${account} - ${r.detail || r.error}`); // 只記帳號與原因，不記密碼
-    return { code: 401, body: { error: r.error || '帳號或密碼錯誤。', field: 'password' } };
+  const r = db.roster.find((x) => x.studentNo === studentNo);
+  if (!r) {
+    console.log(`[報名失敗] 查無學號 ${studentNo}`);
+    return { code: 404, body: { error: '查無此學號，請確認輸入正確的學號。', field: 'account' } };
+  }
+  if (normName(r.name) !== normName(name)) {
+    console.log(`[報名失敗] 學號 ${studentNo} 姓名不符（輸入：${name}）`);
+    return { code: 400, body: { error: '姓名有誤，請確認輸入與學籍資料相符的姓名。', field: 'name' } };
   }
 
-  const st = r.student;
-  const already = db.entries.find((e) => e.studentNo === (st.studentNo || '').toUpperCase());
+  const already = db.entries.find((e) => e.studentNo === studentNo);
   if (already) {
-    Object.assign(already, {
-      name: st.name || already.name, dept: st.dept || already.dept,
-      className: st.className || already.className, email: st.email || already.email,
-      lastLoginAt: new Date().toISOString(), loginCount: (already.loginCount || 1) + 1,
-    });
-    save();
-    console.log(`[重複登入] ${already.studentNo} ${already.no}`);
+    Object.assign(already, { lastLoginAt: new Date().toISOString(), loginCount: (already.loginCount || 1) + 1 });
+    save(true);
+    console.log(`[重複報名] ${already.studentNo} ${already.no}`);
     return { code: 200, body: { ok: true, already: true, no: already.no, name: already.name, dept: already.dept, studentNo: already.studentNo } };
   }
-  const v = parseStudent({ studentNo: st.studentNo, name: st.name, dept: st.dept, className: st.className, email: st.email });
-  if (v.error) return { code: 400, body: { error: v.error } };
-  const entry = addEntry({ ...v.data, source: 'sso', lastLoginAt: new Date().toISOString(), loginCount: 1, raw: st.raw });
+  const entry = addEntry({
+    studentNo, name: r.name, dept: r.dept || '', className: '',
+    email: r.email || '', phone: r.phone || '', rosterNote: r.note || '',
+    source: 'roster', lastLoginAt: new Date().toISOString(), loginCount: 1,
+  }, true); // 現場報名：走報到日誌＋延後合併寫檔
   console.log(`[報名成功] ${entry.studentNo} ${entry.no} ${entry.name}`);
   return { code: 200, body: { ok: true, no: entry.no, name: entry.name, dept: entry.dept, studentNo: entry.studentNo } };
 }
@@ -273,38 +316,16 @@ async function handle(req, res) {
 
   // 前台
   if (m === 'GET' && p === '/api/status') {
-    return send(res, 200, { title: db.settings.title, open: db.settings.open, count: db.entries.length, sso: sso.status() });
+    return send(res, 200, { title: db.settings.title, open: db.settings.open, count: db.entries.length, rosterCount: db.roster.length });
   }
   if (m === 'POST' && p === '/api/login') {
-    if (limited(clientIp(req), 10)) return send(res, 429, { error: '嘗試太多次，請稍候一分鐘再試。' });
     let b; try { b = await readBody(req); } catch { return send(res, 400, { error: '資料格式錯誤' }); }
-    const r = await ssoLogin(clean(b.account, 40).replace(/\s/g, ''), String(b.password || ''));
+    // 現場上千人共用校內 Wi-Fi 會是同一個對外 IP，所以流量限制改用「學號」為單位：
+    // 同一個學號每分鐘最多試 12 次（擋住猜姓名），不同人之間不會互相影響。
+    if (limited('no:' + String(b.studentNo || '').toUpperCase().trim(), 12)) return send(res, 429, { error: '這個學號嘗試太多次，請稍候一分鐘再試，或洽現場服務台。', field: 'account' });
+    if (limited('all', 3000)) return send(res, 429, { error: '目前報名人數太多，請稍等幾秒再送出一次。' });
+    const r = rosterLogin(b.studentNo, b.name);
     return send(res, r.code, r.body);
-  }
-
-  // 世新 SSO『認證Key 法』：由學校入口以 POST 送 AuthID／AuthKey 過來
-  if (m === 'POST' && (p === '/sso/accept' || p === '/sso/accept/')) {
-    let form; try { form = await readForm(req); } catch { form = {}; }
-    const keys = Object.keys(form);
-    const idKey = keys.find((k) => /^auth\s*id$/i.test(k.trim())) || 'AuthID';
-    const keyKey = keys.find((k) => /^auth\s*key$/i.test(k.trim())) || 'AuthKey';
-    const r = await ssoLogin(clean(form[idKey], 40).replace(/\s/g, ''), String(form[keyKey] || '').trim());
-    const token = crypto.randomBytes(12).toString('hex');
-    ssoResults.set(token, { at: Date.now(), ok: r.code === 200, ...(r.code === 200 ? r.body : { error: r.body.error }) });
-    res.writeHead(302, { Location: '/?t=' + token, 'Cache-Control': 'no-store' });
-    return res.end();
-  }
-  if (m === 'GET' && p === '/api/sso-result') {
-    const t = url.searchParams.get('t') || '';
-    const r = ssoResults.get(t);
-    ssoResults.delete(t); // 一次性
-    if (!r || Date.now() - r.at > 5 * 60_000) return send(res, 404, { error: '登入結果已過期，請重新登入。' });
-    return send(res, r.ok ? 200 : 401, r);
-  }
-  // 供學校入口呼叫的登出頁
-  if (m === 'GET' && (p === '/sso/logout' || p === '/logout')) {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    return res.end('<!doctype html><meta charset="utf-8"><title>登出</title><body style="font-family:sans-serif;padding:24px">已登出世新在校生抽獎系統。</body>');
   }
 
   // 後台登入
@@ -330,12 +351,68 @@ async function handle(req, res) {
     if (m === 'POST' && p === '/api/admin/logout') { sessions.delete(cookie(req, 'sid')); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; Path=/; Max-Age=0' }); }
     if (m === 'GET' && p === '/api/admin/state') {
       return send(res, 200, {
-        sso: sso.status(),
+        roster: { count: db.roster.length, importedAt: db.rosterImportedAt },
         settings: db.settings,
         entries: db.entries.map((e) => publicEntry(e, winnerSet)),
         winners: db.winners,
         remaining: remaining().length,
       });
+    }
+    if (m === 'POST' && p === '/api/admin/roster/import') {
+      let b; try { b = await readBody(req, 5_000_000); } catch { return send(res, 413, { error: '名單資料太大或格式錯誤，請分批匯入。' }); }
+      const list = Array.isArray(b.records) ? b.records : [];
+      if (!list.length) return send(res, 400, { error: '沒有收到任何名單資料。' });
+      const byNo = new Map();
+      let skipped = 0;
+      for (const row of list) {
+        const studentNo = clean(row.studentNo, 20).toUpperCase().replace(/\s/g, '');
+        const name = clean(row.name, 40);
+        if (!validStudentNo(studentNo) || !name) { skipped++; continue; }
+        byNo.set(studentNo, {
+          studentNo, name,
+          dept: clean(row.dept, 60),
+          phone: clean(row.phone, 30),
+          email: clean(row.email, 80),
+          note: clean(row.note, 200),
+        });
+      }
+      db.roster = [...byNo.values()];
+      db.rosterImportedAt = new Date().toISOString();
+      save();
+      console.log(`[名單匯入] ${db.roster.length} 筆（略過 ${skipped} 筆格式錯誤）`);
+      return send(res, 200, { ok: true, count: db.roster.length, skipped });
+    }
+    if (m === 'GET' && p === '/api/admin/roster/list') {
+      const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+      const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 50, 1), 200);
+      const offset = Math.max(Number(url.searchParams.get('offset')) || 0, 0);
+      const matched = q
+        ? db.roster.filter((r) => [r.studentNo, r.name, r.dept, r.phone, r.email, r.note].join(' ').toLowerCase().includes(q))
+        : db.roster;
+      const registeredSet = new Set(db.entries.map((e) => e.studentNo));
+      const items = matched.slice(offset, offset + limit).map((r) => ({ ...r, registered: registeredSet.has(r.studentNo) }));
+      return send(res, 200, { total: matched.length, items });
+    }
+    let rm;
+    if (m === 'PUT' && (rm = p.match(/^\/api\/admin\/roster\/([A-Z0-9-]{4,20})$/))) {
+      const oldNo = rm[1];
+      const idx = db.roster.findIndex((r) => r.studentNo === oldNo);
+      if (idx === -1) return send(res, 404, { error: '找不到這筆在校生名單資料' });
+      let b; try { b = await readBody(req); } catch { return send(res, 400, { error: '資料格式錯誤' }); }
+      const studentNo = clean(b.studentNo, 20).toUpperCase().replace(/\s/g, '');
+      const name = clean(b.name, 40);
+      if (!validStudentNo(studentNo)) return send(res, 400, { error: '學號格式不正確（4–20 碼英數字）。', field: 'studentNo' });
+      if (!name) return send(res, 400, { error: '請填寫姓名。', field: 'name' });
+      if (studentNo !== oldNo && db.roster.some((r) => r.studentNo === studentNo)) return send(res, 409, { error: `學號 ${studentNo} 已經存在於名單中。`, field: 'studentNo' });
+      db.roster[idx] = { studentNo, name, dept: clean(b.dept, 60), phone: clean(b.phone, 30), email: clean(b.email, 80), note: clean(b.note, 200) };
+      save();
+      return send(res, 200, { ok: true, record: db.roster[idx] });
+    }
+    if (m === 'DELETE' && (rm = p.match(/^\/api\/admin\/roster\/([A-Z0-9-]{4,20})$/))) {
+      const n = db.roster.length;
+      db.roster = db.roster.filter((r) => r.studentNo !== rm[1]);
+      save();
+      return send(res, 200, { ok: true, removed: n - db.roster.length });
     }
     if (m === 'GET' && p === '/api/admin/switch-url') return send(res, 200, { url: siblingDrawUrl() });
     if (m === 'GET' && p === '/api/admin/draw-info') {
@@ -390,7 +467,7 @@ async function handle(req, res) {
       const pool = remaining();
       if (!pool.length) return send(res, 400, { error: '已經沒有待抽的校友了。' });
       const e = pool[crypto.randomInt(pool.length)];
-      const w = { id: crypto.randomUUID(), entryId: e.id, no: e.no, name: e.name, dept: e.dept, studentNo: e.studentNo, className: e.className, email: e.email, prize: clean(b.prize, 30) || db.settings.prize || '', drawnAt: new Date().toISOString() };
+      const w = { id: crypto.randomUUID(), entryId: e.id, no: e.no, name: e.name, dept: e.dept, studentNo: e.studentNo, className: e.className, email: e.email, phone: e.phone, rosterNote: e.rosterNote, prize: clean(b.prize, 30) || db.settings.prize || '', drawnAt: new Date().toISOString() };
       db.winners.push(w); save();
       return send(res, 200, { ok: true, winner: w, remaining: pool.length - 1 });
     }
@@ -424,7 +501,7 @@ async function handle(req, res) {
       if (v.error) return send(res, v.code || 400, { error: v.error, field: v.field });
       Object.assign(e, v.data, { updatedAt: new Date().toISOString() });
       // 中獎紀錄一併同步，投影畫面與匯出才不會顯示舊資料
-      for (const w of db.winners) if (w.entryId === e.id) Object.assign(w, { name: e.name, dept: e.dept, studentNo: e.studentNo, className: e.className, email: e.email });
+      for (const w of db.winners) if (w.entryId === e.id) Object.assign(w, { name: e.name, dept: e.dept, studentNo: e.studentNo, className: e.className, email: e.email, phone: e.phone });
       save();
       return send(res, 200, { ok: true, entry: publicEntry(e, winnerSet) });
     }
@@ -436,11 +513,11 @@ async function handle(req, res) {
     if (m === 'GET' && p === '/api/admin/export.csv') {
       const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
       const winMap = new Map(db.winners.map((w) => [w.entryId, w]));
-      const rows = [['報名編號', '學號', '姓名', '系所', 'Email', '來源', '報名時間', '最後登入', '中獎獎項', '抽出時間']];
+      const rows = [['報名編號', '學號', '姓名', '系所', '電話', 'Email', '備註', '來源', '報名時間', '最後登入', '中獎獎項', '抽出時間']];
       for (const e of db.entries) {
         const w = winMap.get(e.id);
         const tw = (t) => t ? new Date(t).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '';
-        rows.push([e.no, e.studentNo, e.name, e.dept, e.email, e.addedBy === 'admin' ? '後台補登' : 'SSO 登入',
+        rows.push([e.no, e.studentNo, e.name, e.dept, e.phone, e.email, e.rosterNote, e.addedBy === 'admin' ? '後台補登' : '在校生名單比對',
           tw(e.createdAt), tw(e.lastLoginAt), w ? w.prize : '', w ? tw(w.drawnAt) : '']);
       }
       const csv = '﻿' + rows.map((r) => r.map(q).join(',')).join('\r\n');
@@ -452,10 +529,32 @@ async function handle(req, res) {
   return send(res, 404, { error: 'not found' });
 }
 
-http.createServer((req, res) => {
+// ---------- 啟動伺服器 ----------
+// 現場可能上千支手機同時送出，這裡把連線佇列開大、加上逾時，
+// 並且確保任何意外都只記錄不結束程式（報到不能中斷）。
+process.on('uncaughtException', (e) => console.error('[未攔截的例外，已忽略繼續服務]', e));
+process.on('unhandledRejection', (e) => console.error('[未處理的 Promise，已忽略繼續服務]', e));
+
+const server = http.createServer((req, res) => {
   handle(req, res).catch((e) => { console.error(e); if (!res.headersSent) send(res, 500, { error: '伺服器錯誤' }); });
-}).listen(PORT, () => {
-  console.log(`世新在校生抽獎：http://localhost:${PORT}  後台 /admin  密碼：${ADMIN_PASSWORD}`);
-  const st = sso.status();
-  console.log(`【SSO】${st.label}${st.url ? ' ' + st.url : ''}${st.ready ? '' : '（尚未設定廠商帳密，學生無法登入）'}`);
 });
+server.headersTimeout = 15_000;   // 15 秒還沒把表頭送完就放掉
+server.requestTimeout = 20_000;   // 單一請求最多 20 秒
+server.keepAliveTimeout = 10_000; // 閒置連線 10 秒回收
+server.on('clientError', (err, socket) => {            // 壞掉的連線不要讓程式倒
+  if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+  socket.destroy();
+});
+// 每 5 分鐘清掉過期的流量計數與登入權杖，活動開一整天也不會越吃越多記憶體
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, arr] of rate) { const live = arr.filter((t) => now - t < 60_000); live.length ? rate.set(k, live) : rate.delete(k); }
+  for (const [t, exp] of sessions) if (exp < now) sessions.delete(t);
+  for (const [t, exp] of designSessions) if (exp < now) designSessions.delete(t);
+}, 300_000).unref();
+
+server.listen(PORT, 2048, () => {  // 2048 = 連線佇列長度，瞬間湧入也排得下
+  console.log(`世新在校生抽獎：http://localhost:${PORT}  後台 /admin  密碼：${ADMIN_PASSWORD}`);
+  console.log(`【在校生名單】目前已匯入 ${db.roster.length} 筆${db.roster.length ? '' : '（尚未匯入名單，學生無法報名，請用後台「匯入在校生名單」功能匯入）'}`);
+});
+

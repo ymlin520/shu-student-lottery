@@ -67,7 +67,7 @@
 <header class="topbar">
   <div class="brand"><img class="brand-logo" src="/brand/logo" data-asset="logo" alt="Logo"><span>在校生抽獎後台</span></div>
   <div id="nav" hidden style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-    <div class="tabs"><button class="on" data-tab="draw">抽獎管理</button><button data-tab="list">名單管理</button><a href="/design" target="_blank">設計 ↗</a></div>
+    <div class="tabs"><button class="on" data-tab="draw">抽獎管理</button><button data-tab="roster">在校生名單</button><button data-tab="list">報名名單</button><a href="/design" target="_blank">設計 ↗</a></div>
     <button class="btn-ghost" id="logout">登出</button>
   </div>
 </header>
@@ -83,7 +83,6 @@
 </section>
 
 <main class="wrap" id="app" hidden>
-  <div class="msg err" id="mockBanner" hidden style="margin-bottom:0"></div>
   <!-- ===== 抽獎 ===== -->
   <div id="tab-draw">
     <section class="card panel draw-link">
@@ -121,13 +120,37 @@
       </div>
       <p class="sub">抽獎畫面抽出後會自動出現在這裡。撤銷單筆或按「重新抽獎」後，該同學會回到待抽名單，可以重新抽過。</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>獎項</th><th>姓名</th><th>學號</th><th>系所</th><th>抽出時間</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>獎項</th><th>姓名</th><th>學號</th><th>系所</th><th>電話</th><th>匯入備註</th><th>抽出時間</th><th></th></tr></thead>
         <tbody id="winnerRows"></tbody>
       </table></div>
     </section>
   </div>
 
-  <!-- ===== 名單 ===== -->
+  <!-- ===== 在校生名單（匯入比對用的名單，可搜尋／編輯／刪除） ===== -->
+  <div id="tab-roster" hidden>
+    <section class="card panel" style="margin-top:0">
+      <div class="toolbar" style="margin-bottom:0">
+        <div><h3 style="margin:0">在校生名單</h3><p class="sub" style="margin:4px 0 0" id="rosterInfo">尚未匯入</p></div>
+        <button class="btn-ghost" id="importRoster" style="border-color:var(--gold);color:var(--gold-hi)">⭱ 匯入在校生名單</button>
+      </div>
+    </section>
+    <section class="card panel" style="margin-top:14px">
+      <div class="toolbar">
+        <input class="input" id="rosterSearch" placeholder="搜尋姓名、學號、系所、電話、Email、備註">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <span class="muted" id="rosterCount" style="font-size:13px"></span>
+          <button class="btn-ghost" id="rosterPrev">‹ 上一頁</button>
+          <button class="btn-ghost" id="rosterNext">下一頁 ›</button>
+        </div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>學號</th><th>姓名</th><th>系所</th><th>電話</th><th>Email</th><th>備註</th><th>報名狀態</th><th></th></tr></thead>
+        <tbody id="rosterRows"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- ===== 報名名單 ===== -->
   <div id="tab-list" hidden>
     <section class="card panel" style="margin-top:0">
       <div class="stats">
@@ -146,7 +169,7 @@
         </div>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>編號</th><th>學號</th><th>姓名</th><th>系所</th><th>Email</th><th>報名時間</th><th>狀態</th><th></th></tr></thead>
+        <thead><tr><th>編號</th><th>學號</th><th>姓名</th><th>系所</th><th>電話</th><th>Email</th><th>報名時間</th><th>狀態</th><th></th></tr></thead>
         <tbody id="entryRows"></tbody>
       </table></div>
     </section>
@@ -156,7 +179,7 @@
 <dialog class="modal" id="entryModal">
   <div class="modal-head">
     <h3 id="modalTitle">手動新增學生</h3>
-    <p class="sub" id="modalSub" style="margin:0 0 4px">手動補登的學生會和 SSO 登入報名的名單一起參加抽獎。</p>
+    <p class="sub" id="modalSub" style="margin:0 0 4px">手動補登的學生會和比對在校生名單報名的學生一起參加抽獎。</p>
   </div>
   <div class="modal-body">
     <div id="modalErr" class="msg err" hidden></div>
@@ -167,12 +190,56 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div class="field"><label for="mDept">系所<span class="opt">選填</span></label><input class="input" id="mDept" maxlength="60" placeholder="例：新聞學系"></div>
     </div>
-    <div class="field"><label for="mEmail">Email<span class="opt">選填</span></label>
-      <input class="input" id="mEmail" maxlength="80" placeholder="例：a1100123@mail.shu.edu.tw"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label for="mPhone">電話<span class="opt">選填</span></label><input class="input" id="mPhone" maxlength="30" placeholder="例：0912345678"></div>
+      <div class="field"><label for="mEmail">Email<span class="opt">選填</span></label>
+        <input class="input" id="mEmail" maxlength="80" placeholder="例：a1100123@mail.shu.edu.tw"></div>
+    </div>
   </div>
   <div class="modal-foot">
     <button type="button" class="btn-ghost" id="modalCancel">取消</button>
     <button type="button" class="btn-gold" id="modalSave">儲存</button>
+  </div>
+</dialog>
+
+<dialog class="modal" id="rosterModal" style="width:min(680px, 94vw)">
+  <div class="modal-head">
+    <h3>匯入在校生名單</h3>
+    <p class="sub" style="margin:0 0 4px">從 Excel／Google 試算表複製欄位後貼上。每列依序為：<b>學號、姓名、系所、電話、Email</b>（Tab 或逗號分隔，系所／電話／Email 可留空）。第一列若不是學號開頭會自動當成標題列略過。<br>匯入會<b>整批取代</b>目前的在校生名單（不影響已報名資料）。</p>
+  </div>
+  <div class="modal-body">
+    <div id="rosterErr" class="msg err" hidden></div>
+    <div id="rosterOk" class="msg ok" hidden></div>
+    <textarea class="input" id="rosterText" rows="10" style="width:100%;font-family:monospace;font-size:13px;resize:vertical" placeholder="A1100123&#9;王小明&#9;新聞學系&#9;0912345678&#9;a1100123@mail.shu.edu.tw"></textarea>
+  </div>
+  <div class="modal-foot">
+    <button type="button" class="btn-ghost" id="rosterCancel">取消</button>
+    <button type="button" class="btn-gold" id="rosterSave">匯入</button>
+  </div>
+</dialog>
+
+<dialog class="modal" id="rosterEditModal">
+  <div class="modal-head">
+    <h3>修改在校生名單資料</h3>
+    <p class="sub" style="margin:0 0 4px">改完儲存後，學生用新的學號／姓名就能比對報名；已經報名過的資料不會被這裡的修改自動更新。</p>
+  </div>
+  <div class="modal-body">
+    <div id="rEditErr" class="msg err" hidden></div>
+    <div class="field"><label for="rStudentNo">學號<span class="req">*</span></label>
+      <input class="input" id="rStudentNo" maxlength="20" style="text-transform:uppercase"></div>
+    <div class="field"><label for="rName">姓名<span class="req">*</span></label>
+      <input class="input" id="rName" maxlength="40"></div>
+    <div class="field"><label for="rDept">系所<span class="opt">選填</span></label><input class="input" id="rDept" maxlength="60"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label for="rPhone">電話<span class="opt">選填</span></label><input class="input" id="rPhone" maxlength="30"></div>
+      <div class="field"><label for="rEmail">Email<span class="opt">選填</span></label><input class="input" id="rEmail" maxlength="80"></div>
+    </div>
+    <div class="field"><label for="rNote">備註<span class="opt">選填</span></label><input class="input" id="rNote" maxlength="200"></div>
+  </div>
+  <div class="modal-foot">
+    <button type="button" class="btn-ghost btn-danger" id="rEditDelete" style="margin-right:auto">刪除這筆</button>
+    <button type="button" class="btn-ghost" id="rEditCancel">取消</button>
+    <button type="button" class="btn-gold" id="rEditSave">儲存</button>
   </div>
 </dialog>
 
@@ -201,41 +268,114 @@ function maskName(n) {
 // ---------- 登入 ----------
 $('#loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  try { await api('/api/admin/login', { method: 'POST', body: { password: $('#pw').value } }); $('#loginCard').hidden = true; load(); }
+  try { await api('/api/admin/login', { method: 'POST', body: { password: $('#pw').value } }); $('#loginCard').hidden = true; load(); if (initialTab) loadRoster(); }
   catch (err) { const b = $('#loginErr'); b.textContent = err.message; b.hidden = false; }
 });
 $('#logout').addEventListener('click', async () => { await api('/api/admin/logout', { method: 'POST' }).catch(() => {}); showLogin(); });
 
 // ---------- 分頁 ----------
-document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
-  document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
-  $('#tab-draw').hidden = b.dataset.tab !== 'draw';
-  $('#tab-list').hidden = b.dataset.tab !== 'list';
-  if (b.dataset.tab === 'list') load();
-}));
+function selectTab(tab) {
+  document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
+  $('#tab-draw').hidden = tab !== 'draw';
+  $('#tab-roster').hidden = tab !== 'roster';
+  $('#tab-list').hidden = tab !== 'list';
+  if (tab === 'list') load();
+  if (tab === 'roster') loadRoster();
+}
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
+const initialTab = new URLSearchParams(location.search).get('tab');
+if (initialTab === 'roster' || initialTab === 'list') selectTab(initialTab);
 
 async function load() {
   try { state = await api('/api/admin/state'); } catch { return; }
   $('#app').hidden = false; $('#nav').hidden = false; $('#nav').style.display = 'flex';
   if (!settingsDirty) fillSettings();
   $('#regUrl').textContent = location.origin + '/';
-  renderSsoBanner(state.sso || {});
   $('#drawUrl').textContent = location.origin + '/draw';
+  renderRosterInfo(state.roster || {});
   renderAll();
 }
-function renderSsoBanner(s) {
-  const b = $('#mockBanner');
-  let msg = '';
-  if (s.mock) msg = '⚠️ SSO 目前是<b>測試模式</b>：任何帳號密碼都會通過，學生資料是假的。正式活動前請在 <code>sso-config.json</code> 把 mode 改成 shu 並填入廠商帳密。';
-  else if (!s.ready) msg = '⚠️ <b>' + s.label + '</b>：尚未填入世新提供的廠商帳號密碼（id1／id2），學生目前無法登入。';
-  else if (s.test) msg = '🧪 目前連線：<b>' + s.label + '</b>，只有系統組提供的測試帳號可以登入。正式活動前請把 env 改成 prod。';
-  else msg = '';
-  b.innerHTML = msg;
-  b.hidden = !msg;
-  b.style.background = s.test && !s.mock && s.ready ? 'rgba(216,172,90,.18)' : '';
-  b.style.borderColor = s.test && !s.mock && s.ready ? 'var(--line)' : '';
-  b.style.color = s.test && !s.mock && s.ready ? 'var(--gold-hi)' : '';
+function renderRosterInfo(r) {
+  $('#rosterInfo').textContent = r.count
+    ? `已匯入 ${r.count} 筆在校生名單${r.importedAt ? '（' + fmt(r.importedAt) + '）' : ''}`
+    : '尚未匯入在校生名單，學生目前無法報名，請按右方「匯入在校生名單」。';
 }
+
+// ---------- 在校生名單：搜尋、分頁、編輯 ----------
+const ROSTER_PAGE = 50;
+let rosterOffset = 0, rosterTotal = 0, rosterSearchTimer = null;
+async function loadRoster() {
+  const q = $('#rosterSearch').value.trim();
+  let d;
+  try { d = await api('/api/admin/roster/list?q=' + encodeURIComponent(q) + '&limit=' + ROSTER_PAGE + '&offset=' + rosterOffset); }
+  catch (err) { if ($('#loginCard').hidden) alert(err.message); return; }
+  rosterTotal = d.total;
+  renderRosterRows(d.items);
+  const shown = d.items.length ? `${rosterOffset + 1}–${rosterOffset + d.items.length}` : '0';
+  $('#rosterCount').textContent = `共 ${rosterTotal} 筆，顯示 ${shown}`;
+  $('#rosterPrev').disabled = rosterOffset <= 0;
+  $('#rosterNext').disabled = rosterOffset + ROSTER_PAGE >= rosterTotal;
+}
+function renderRosterRows(items) {
+  $('#rosterRows').innerHTML = items.length ? items.map((r) => `<tr>
+    <td class="num">${esc(r.studentNo)}</td><td><b>${esc(r.name)}</b></td>
+    <td>${esc(r.dept) || '<span class="muted">—</span>'}</td>
+    <td class="muted">${esc(r.phone) || '—'}</td>
+    <td class="muted">${esc(r.email) || '—'}</td>
+    <td class="muted">${esc(r.note) || '—'}</td>
+    <td>${r.registered ? '<span class="tag">已報名</span>' : '<span class="tag gray">未報名</span>'}</td>
+    <td><button class="btn-ghost" data-redit="${esc(r.studentNo)}" style="padding:5px 12px">編輯</button></td></tr>`).join('')
+    : `<tr><td colspan="8" class="empty">${$('#rosterSearch').value.trim() ? '找不到符合的學生' : '尚未匯入在校生名單'}</td></tr>`;
+}
+$('#rosterSearch').addEventListener('input', () => {
+  clearTimeout(rosterSearchTimer);
+  rosterSearchTimer = setTimeout(() => { rosterOffset = 0; loadRoster(); }, 300);
+});
+$('#rosterPrev').addEventListener('click', () => { rosterOffset = Math.max(0, rosterOffset - ROSTER_PAGE); loadRoster(); });
+$('#rosterNext').addEventListener('click', () => { rosterOffset += ROSTER_PAGE; loadRoster(); });
+
+const rosterEditModal = $('#rosterEditModal');
+let rEditNo = null;
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-redit]');
+  if (!btn) return;
+  openRosterEdit(btn.dataset.redit);
+});
+async function openRosterEdit(studentNo) {
+  rEditNo = studentNo;
+  $('#rEditErr').hidden = true;
+  const r = (await api('/api/admin/roster/list?q=' + encodeURIComponent(studentNo) + '&limit=200')).items.find((x) => x.studentNo === studentNo);
+  if (!r) return alert('找不到這筆資料，請重新整理。');
+  $('#rStudentNo').value = r.studentNo; $('#rName').value = r.name;
+  $('#rDept').value = r.dept || ''; $('#rPhone').value = r.phone || '';
+  $('#rEmail').value = r.email || ''; $('#rNote').value = r.note || '';
+  rosterEditModal.showModal();
+}
+$('#rEditCancel').addEventListener('click', () => rosterEditModal.close());
+$('#rEditSave').addEventListener('click', async () => {
+  const body = {
+    studentNo: $('#rStudentNo').value.trim().toUpperCase(),
+    name: $('#rName').value.trim(),
+    dept: $('#rDept').value.trim(),
+    phone: $('#rPhone').value.trim(),
+    email: $('#rEmail').value.trim(),
+    note: $('#rNote').value.trim(),
+  };
+  const btn = $('#rEditSave'); btn.disabled = true; btn.textContent = '儲存中…';
+  try {
+    await api('/api/admin/roster/' + encodeURIComponent(rEditNo), { method: 'PUT', body });
+    rosterEditModal.close(); loadRoster(); load();
+  } catch (err) {
+    const box = $('#rEditErr'); box.textContent = err.message; box.hidden = false;
+  } finally { btn.disabled = false; btn.textContent = '儲存'; }
+});
+$('#rEditDelete').addEventListener('click', async () => {
+  if (!confirm(`確定從在校生名單刪除「${$('#rName').value}」（${rEditNo}）？已經報名過的資料不會被刪除。`)) return;
+  try {
+    await api('/api/admin/roster/' + encodeURIComponent(rEditNo), { method: 'DELETE' });
+    rosterEditModal.close(); loadRoster(); load();
+  } catch (err) { alert(err.message); }
+});
 function renderAll() {
   renderWinners(); renderEntries();
 }
@@ -246,9 +386,11 @@ function renderWinners() {
     <td><b>${esc(w.name)}</b></td>
     <td class="num">${esc(w.studentNo) || '<span class="muted">—</span>'}</td>
     <td>${esc(w.dept) || '<span class="muted">—</span>'}</td>
+    <td class="muted">${esc(w.phone) || '—'}</td>
+    <td class="muted">${esc(w.rosterNote) || '—'}</td>
     <td class="muted">${fmt(w.drawnAt)}</td>
     <td><button class="btn-ghost btn-danger" data-undo="${w.id}" style="padding:5px 12px">撤銷</button></td></tr>`).join('')
-    : '<tr><td colspan="8" class="empty">還沒有抽出任何人</td></tr>';
+    : '<tr><td colspan="9" class="empty">還沒有抽出任何人</td></tr>';
 }
 function renderEntries() {
   const q = $('#search').value.trim().toLowerCase();
@@ -259,6 +401,7 @@ function renderEntries() {
   $('#entryRows').innerHTML = list.length ? list.map((e) => `<tr>
     <td class="num">${esc(e.no)}</td><td class="num">${esc(e.studentNo)}</td><td><b>${esc(e.name)}</b></td>
     <td>${esc(e.dept) || '<span class="muted">—</span>'}</td>
+    <td class="muted">${esc(e.phone) || '—'}</td>
     <td class="muted">${esc(e.email) || '—'}</td><td class="muted">${fmt(e.createdAt)}</td>
     <td>${e.won ? '<span class="tag">已中獎</span>' : '<span class="tag gray">待抽</span>'}${e.addedBy === 'admin' ? ' <span class="tag gray">後台補登</span>' : ''}</td>
     <td style="display:flex;gap:6px"><button class="btn-ghost" data-edit="${e.id}" style="padding:5px 12px">編輯</button><button class="btn-ghost btn-danger" data-del="${e.id}" data-name="${esc(e.name)}" style="padding:5px 12px">刪除</button></td></tr>`).join('')
@@ -293,13 +436,14 @@ function fillModal(e) {
   $('#mStudentNo').value = e ? (e.studentNo || '') : '';
   $('#mName').value = e ? e.name : '';
   $('#mDept').value = e ? (e.dept || '') : '';
+  $('#mPhone').value = e ? (e.phone || '') : '';
   $('#mEmail').value = e ? (e.email || '') : '';
   $('#modalErr').hidden = true;
 }
 async function openModal(id) {
   editId = id || null;
   $('#modalTitle').textContent = id ? '修改學生資料' : '手動新增學生';
-  $('#modalSub').textContent = id ? '修改後，中獎紀錄與匯出的 CSV 也會一起更新。' : '手動補登的學生會和 SSO 登入報名的名單一起參加抽獎。';
+  $('#modalSub').textContent = id ? '修改後，中獎紀錄與匯出的 CSV 也會一起更新。' : '手動補登的學生會和比對在校生名單報名的學生一起參加抽獎。';
   if (id) {
     try { fillModal((await api('/api/admin/entries/' + id)).entry); } catch (err) { return alert(err.message); }
   } else fillModal(null);
@@ -313,6 +457,7 @@ $('#modalSave').addEventListener('click', async () => {
     studentNo: $('#mStudentNo').value.trim().toUpperCase(),
     name: $('#mName').value.trim(),
     dept: $('#mDept').value.trim(),
+    phone: $('#mPhone').value.trim(),
     email: $('#mEmail').value.trim(),
   };
   const btn = $('#modalSave'); btn.disabled = true; btn.textContent = '儲存中…';
@@ -323,6 +468,42 @@ $('#modalSave').addEventListener('click', async () => {
     const box = $('#modalErr'); box.textContent = err.message; box.hidden = false;
   } finally { btn.disabled = false; btn.textContent = '儲存'; }
 });
+// ---------- 匯入在校生名單 ----------
+const rosterModal = $('#rosterModal');
+$('#importRoster').addEventListener('click', () => {
+  $('#rosterText').value = ''; $('#rosterErr').hidden = true; $('#rosterOk').hidden = true;
+  rosterModal.showModal();
+});
+$('#rosterCancel').addEventListener('click', () => rosterModal.close());
+function parseRosterText(text) {
+  const idRe = /^[A-Z0-9-]{4,20}$/i;
+  const lines = text.split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean);
+  const records = [];
+  for (const line of lines) {
+    const cols = line.split(/\t|,/).map((c) => c.trim());
+    const [studentNo, name, dept, phone, email] = cols;
+    if (!studentNo || !idRe.test(studentNo.toUpperCase().replace(/\s/g, ''))) continue; // 略過標題列或格式不符的列
+    if (!name) continue;
+    records.push({ studentNo, name, dept: dept || '', phone: phone || '', email: email || '' });
+  }
+  return records;
+}
+$('#rosterSave').addEventListener('click', async () => {
+  const records = parseRosterText($('#rosterText').value);
+  $('#rosterErr').hidden = true; $('#rosterOk').hidden = true;
+  if (!records.length) { $('#rosterErr').textContent = '沒有辨識出任何有效的學號列，請確認格式（學號、姓名、系所、電話、Email，Tab 或逗號分隔）。'; $('#rosterErr').hidden = false; return; }
+  const btn = $('#rosterSave'); btn.disabled = true; btn.textContent = '匯入中…';
+  try {
+    const r = await api('/api/admin/roster/import', { method: 'POST', body: { records } });
+    $('#rosterOk').textContent = `✓ 已匯入 ${r.count} 筆在校生名單${r.skipped ? '（略過 ' + r.skipped + ' 筆格式錯誤）' : ''}。`;
+    $('#rosterOk').hidden = false;
+    rosterOffset = 0; load(); loadRoster();
+    setTimeout(() => rosterModal.close(), 1200);
+  } catch (err) {
+    $('#rosterErr').textContent = err.message; $('#rosterErr').hidden = false;
+  } finally { btn.disabled = false; btn.textContent = '匯入'; }
+});
+
 // ---------- 抽獎設定：改完按儲存 ----------
 let settingsDirty = false;
 function fillSettings() {
