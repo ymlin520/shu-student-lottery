@@ -150,8 +150,11 @@
     letter-spacing: var(--dept-spacing, 0.5em); padding-left: var(--dept-spacing, 0.5em);
     text-shadow: 0 6px 30px rgba(0, 0, 0, .55); margin-top: 17px; animation: pop .5s cubic-bezier(.3,1.6,.5,1); }
   .reveal .meta { color: var(--muted); font-size: clamp(34px, calc(1.6 * var(--vw)), 47px); margin-top: 13px; }
-  .reveal .sid { position: fixed; right: calc(2 * var(--vw)); bottom: calc(2 * var(--vh)); z-index: 30;
-    font-size: clamp(13px, calc(0.5 * var(--vw)), 20px); color: var(--muted); opacity: .8; letter-spacing: .08em; }
+  /* 版面四周 6～7% 會被裁掉（見 fitStage 的 safe 計算），這裡要放在裁切線以內才不會被切到看不見 */
+  /* 揭曉畫面角落的學號：字級與位置都可以在設計後台調 */
+  /* 數字由設計後台的拉條給，單位在這裡補上 */
+  .reveal .sid { position: fixed; right: calc(var(--winner-id-right, 9) * var(--vw)); bottom: calc(var(--winner-id-bottom, 8) * var(--vh)); z-index: 30;
+    font-size: calc(var(--winner-id-size, 80) * 1px); color: var(--muted); opacity: .8; letter-spacing: .08em; }
   .nm-wrap { position: relative; display: inline-block; isolation: isolate; margin-top: var(--name-gap, calc(3.5 * var(--vh))); }
   .reveal .nm { font-size: var(--winner-size); line-height: 1.12; font-weight: 900; font-family: var(--font-display); white-space: nowrap;
     letter-spacing: var(--name-spacing, 0.45em); padding-left: var(--name-spacing, 0.45em);
@@ -263,6 +266,12 @@ function maskName(n) {
   if (a.length === 2) return a[0] + '○';
   return a[0] + '○'.repeat(a.length - 2) + a[a.length - 1];
 }
+// 揭曉畫面角落的學號只顯示前 4 後 3 碼，中間遮起來
+function maskStudentNo(no) {
+  no = String(no ?? '');
+  if (no.length <= 7) return no;
+  return no.slice(0, 4) + '***' + no.slice(-3);
+}
 // 系所縮寫（例如「口傳」）補上「系」，看起來才不會像斷掉；已經是完整名稱（系／所／班／組／程／院結尾）的不動
 function deptDisplay(d) {
   d = String(d ?? '').trim();
@@ -368,7 +377,7 @@ document.addEventListener('previewview', (e) => {
     $('#result').innerHTML = `<div class="lbl">${esc(T('draw.congrats'))}</div>
       <div class="dept">新聞學系</div>
       <div class="nm-wrap"><div class="rays"></div><div class="nm done">${[...shown].map((c) => `<span class="ch" style="opacity:1;animation:none">${esc(c)}</span>`).join('')}</div></div>
-      <div class="sid">A1100123</div>`;
+      <div class="sid">A110***123</div>`;
     $('#trayName').textContent = shown;
     $('#trayName').style.fontSize = 'calc(var(--size) * .062)';
     $('#trayBall').classList.add('show');
@@ -798,7 +807,7 @@ $('#drawBtn').addEventListener('click', async () => {
   $('#result').innerHTML = `<div class="lbl">${esc(T('draw.congrats'))}</div>
     <div class="dept">${w.dept ? esc(deptDisplay(w.dept)) : T('draw.deptEmpty')}</div>
     <div class="nm-wrap"><div class="nm waiting"><span>•</span><span>•</span><span>•</span></div></div>
-    ${w.studentNo ? `<div class="sid">${esc(w.studentNo)}</div>` : ''}`;
+    ${w.studentNo ? `<div class="sid">${esc(maskStudentNo(w.studentNo))}</div>` : ''}`;
   $('#reveal').classList.add('show'); $('#stage').classList.add('revealing');
   centerTrayBall(); // 揭曉時按鈕改成絕對定位、版面會位移，重算一次讓球維持在正中央
   await sleep(cssNum('--reveal-delay', REVEAL_DELAY));

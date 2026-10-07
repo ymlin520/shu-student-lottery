@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/assets/theme.css">
 <style>
   .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px 60px; }
+  body.wide .wrap { max-width: 1680px; }  /* 表格欄位多，放寬才不用左右拉 */
   .login { max-width: 400px; margin: 12vh auto 0; padding: 32px 28px; }
   .login h1 { margin: 0 0 20px; font-size: 22px; letter-spacing: .1em; }
   .tabs { display: flex; gap: 8px; }
@@ -48,6 +49,8 @@
   .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12.5px; background: rgba(216,172,90,.15); color: var(--gold-hi); }
   .tag.gray { background: rgba(255,255,255,.07); color: var(--muted); }
   .muted { color: var(--muted); }
+  .name-link { background: none; border: none; padding: 0; font: inherit; font-weight: 700; color: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .name-link:hover { color: var(--gold-hi); }
   .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .toolbar .input { max-width: 320px; padding: 10px 14px; font-size: 15px; }
   .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -116,11 +119,11 @@
     <section class="card panel">
       <div class="toolbar" style="margin-bottom:6px">
         <div><h3>中獎紀錄</h3></div>
-        <button class="btn-ghost" id="resetWinners" style="border-color:var(--gold);color:var(--gold-hi)">↻ 重新抽獎（清空中獎紀錄）</button>
+        <button class="btn-ghost" id="resetWinners" style="border-color:var(--gold);color:var(--gold-hi)">清空中獎紀錄</button>
       </div>
-      <p class="sub">抽獎畫面抽出後會自動出現在這裡。撤銷單筆或按「重新抽獎」後，該同學會回到待抽名單，可以重新抽過。</p>
+      <p class="sub">抽獎畫面抽出後會自動出現在這裡。撤銷單筆或清空中獎紀錄後，該同學會回到待抽名單，可以再抽到。</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>獎項</th><th>姓名</th><th>學號</th><th>系所</th><th>電話</th><th>匯入備註</th><th>抽出時間</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>姓名</th><th>學號</th><th>系所</th><th>電話</th><th>抽出時間</th><th></th></tr></thead>
         <tbody id="winnerRows"></tbody>
       </table></div>
     </section>
@@ -243,10 +246,39 @@
   </div>
 </dialog>
 
+<dialog class="modal" id="photoModal" style="width:min(420px, 92vw)">
+  <div class="modal-head">
+    <h3 id="photoName">學生照片</h3>
+    <p class="sub" id="photoNo" style="margin:0 0 4px"></p>
+  </div>
+  <div class="modal-body" style="text-align:center">
+    <img id="photoImg" src="" alt="學生照片" style="max-width:100%;border-radius:12px;background:rgba(0,0,0,.25)">
+  </div>
+  <div class="modal-foot">
+    <button type="button" class="btn-ghost" id="photoCancel">關閉</button>
+  </div>
+</dialog>
+
 <script>
 const $ = (s) => document.querySelector(s);
+document.body.classList.add('wide'); // 後台一律用寬版面，表格看得到全部欄位
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (iso) => new Date(iso).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+// 點姓名跳出學生照片（世新教務系統的學生照片）
+const photoUrl = (no) => 'https://eas.shu.edu.tw/EAS/TCH/ShowImg.aspx?id=' + encodeURIComponent(no) + '&photo_type=1';
+const nameLink = (no, name) => no
+  ? `<button type="button" class="name-link" data-photo="${esc(no)}" data-pname="${esc(name)}">${esc(name)}</button>`
+  : `<b>${esc(name)}</b>`;
+const photoModal = $('#photoModal');
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-photo]');
+  if (!btn) return;
+  $('#photoName').textContent = btn.dataset.pname || '';
+  $('#photoNo').textContent = btn.dataset.photo;
+  $('#photoImg').src = photoUrl(btn.dataset.photo);
+  photoModal.showModal();
+});
+$('#photoCancel').addEventListener('click', () => photoModal.close());
 let state = null;
 
 async function api(path, opts = {}) {
@@ -318,7 +350,7 @@ async function loadRoster() {
 }
 function renderRosterRows(items) {
   $('#rosterRows').innerHTML = items.length ? items.map((r) => `<tr>
-    <td class="num">${esc(r.studentNo)}</td><td><b>${esc(r.name)}</b></td>
+    <td class="num">${esc(r.studentNo)}</td><td>${nameLink(r.studentNo, r.name)}</td>
     <td>${esc(r.dept) || '<span class="muted">—</span>'}</td>
     <td class="muted">${esc(r.phone) || '—'}</td>
     <td class="muted">${esc(r.email) || '—'}</td>
@@ -382,15 +414,14 @@ function renderAll() {
 function renderWinners() {
   const rows = state.winners.slice().reverse();
   $('#winnerRows').innerHTML = rows.length ? rows.map((w, i) => `<tr>
-    <td class="num">${rows.length - i}</td><td>${w.prize ? `<span class="tag">${esc(w.prize)}</span>` : '<span class="muted">—</span>'}</td>
-    <td><b>${esc(w.name)}</b></td>
+    <td class="num">${rows.length - i}</td>
+    <td>${nameLink(w.studentNo, w.name)}</td>
     <td class="num">${esc(w.studentNo) || '<span class="muted">—</span>'}</td>
     <td>${esc(w.dept) || '<span class="muted">—</span>'}</td>
     <td class="muted">${esc(w.phone) || '—'}</td>
-    <td class="muted">${esc(w.rosterNote) || '—'}</td>
     <td class="muted">${fmt(w.drawnAt)}</td>
     <td><button class="btn-ghost btn-danger" data-undo="${w.id}" style="padding:5px 12px">撤銷</button></td></tr>`).join('')
-    : '<tr><td colspan="9" class="empty">還沒有抽出任何人</td></tr>';
+    : '<tr><td colspan="7" class="empty">還沒有抽出任何人</td></tr>';
 }
 function renderEntries() {
   const q = $('#search').value.trim().toLowerCase();
@@ -399,7 +430,7 @@ function renderEntries() {
   $('#sTotal').textContent = state.entries.length; $('#sWon').textContent = won;
   $('#sLeft').textContent = state.entries.length - won; $('#sRenamed').textContent = state.entries.filter((e) => e.addedBy === 'admin').length;
   $('#entryRows').innerHTML = list.length ? list.map((e) => `<tr>
-    <td class="num">${esc(e.no)}</td><td class="num">${esc(e.studentNo)}</td><td><b>${esc(e.name)}</b></td>
+    <td class="num">${esc(e.no)}</td><td class="num">${esc(e.studentNo)}</td><td>${nameLink(e.studentNo, e.name)}</td>
     <td>${esc(e.dept) || '<span class="muted">—</span>'}</td>
     <td class="muted">${esc(e.phone) || '—'}</td>
     <td class="muted">${esc(e.email) || '—'}</td><td class="muted">${fmt(e.createdAt)}</td>
@@ -418,7 +449,9 @@ document.addEventListener('click', async (e) => {
 });
 $('#resetWinners').addEventListener('click', async () => {
   if (!state.winners.length) return alert('目前還沒有中獎紀錄。');
-  if (!confirm('重新抽獎會清空全部 ' + state.winners.length + ' 筆中獎紀錄，' + state.entries.length + ' 位同學全部回到待抽名單，可以從頭抽一次。\n\n確定要重新抽獎嗎？')) return;
+  if (!confirm('清空中獎紀錄：目前 ' + state.winners.length + ' 筆中獎紀錄會全部刪除，'
+    + '這些同學會回到待抽名單，' + state.entries.length + ' 位已報名的同學都可以再被抽到。'
+    + '\n報名名單不受影響。\n\n確定要清空中獎紀錄嗎？')) return;
   await api('/api/admin/winners/reset', { method: 'POST' }).catch((err) => alert(err.message)); load();
 });
 $('#clearEntries').addEventListener('click', async () => {
