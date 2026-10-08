@@ -42,7 +42,7 @@ const vars = [
   { key: 'qball-in-ms', group: '抽獎畫面', label: '中獎球掉進承接槽要幾毫秒', type: 'text', default: '1800' },
   { key: 'surname-delay', group: '抽獎畫面', label: '姓出現後等多久才出名字（毫秒）', type: 'text', default: '3000' },
   { key: 'name-char-delay', group: '抽獎畫面', label: '名字逐字出現間隔（毫秒）', type: 'text', default: '650' },
-  { key: 'sfx-pitch', group: '抽獎畫面', label: '音效音高（1 原音、越大越明亮）', type: 'range', min: 0.6, max: 1.6, step: 0.02, default: '1.18' },
+  { key: 'sfx-pitch', group: '抽獎畫面', label: '音效音高（1 原音、越大越明亮）', type: 'range', min: 0.6, max: 1.6, step: 0.02, default: '1' },
   { key: 'sfx-volume', group: '抽獎畫面', label: '音效音量（0 靜音～1 最大，現場可按 M 鍵切換）', type: 'range', min: 0, max: 1, step: 0.05, default: '0.8' },
   { key: 'confetti-every-ms', group: '抽獎畫面', label: '中獎畫面每幾毫秒灑一波花', type: 'text', default: '1200' },
   { key: 'draw-brand-size', group: '抽獎畫面', label: '左上角名稱字級（抽獎頁）', type: 'text', default: '30px' },
