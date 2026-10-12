@@ -302,7 +302,7 @@ function serveStatic(req, res, file) {
 
 // ---------- 報名登記：學號＋姓名比對在校生名單 ----------
 function rosterLogin(studentNoRaw, nameRaw) {
-  if (!db.settings.open) return { code: 403, body: { error: '本次報名已截止，感謝您的參與。' } };
+  if (!db.settings.open) return { code: 403, body: { error: '本次登記已截止，感謝您的參與。' } };
   const studentNo = clean(studentNoRaw, 20).toUpperCase().replace(/\s/g, '');
   const name = clean(nameRaw, 40);
   if (!studentNo) return { code: 400, body: { error: '請輸入學號。', field: 'account' } };
@@ -359,7 +359,7 @@ async function handle(req, res) {
     // 現場上千人共用校內 Wi-Fi 會是同一個對外 IP，所以流量限制改用「學號」為單位：
     // 同一個學號每分鐘最多試 12 次（擋住猜姓名），不同人之間不會互相影響。
     if (limited('no:' + String(b.studentNo || '').toUpperCase().trim(), 12)) return send(res, 429, { error: '這個學號嘗試太多次，請稍候一分鐘再試，或洽現場服務台。', field: 'account' });
-    if (limited('all', 3000)) return send(res, 429, { error: '目前報名人數太多，請稍等幾秒再送出一次。' });
+    if (limited('all', 3000)) return send(res, 429, { error: '目前登記人數太多，請稍等幾秒再送出一次。' });
     const r = rosterLogin(b.studentNo, b.name);
     return send(res, r.code, r.body);
   }

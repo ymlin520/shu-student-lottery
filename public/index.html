@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>世新在校生抽獎報名</title>
+<title>世新在校生抽獎登記</title>
 <link rel="icon" href="/brand/favicon">
 <link rel="stylesheet" href="/assets/theme.css">
 <style>
@@ -44,12 +44,12 @@
   <section class="hero">
     <div class="id-badge" data-t="reg.badge">在校生場　STUDENTS</div>
     <h1><span data-t="reg.title">世新大學在校生抽獎活動</span></h1>
-    <p data-t="reg.intro">輸入學號與姓名，系統會比對在校生名單，完成報名。
-每人限報名一次，祝你好運！</p>
+    <p data-t="reg.intro">輸入學號與姓名，系統會比對在校生名單，完成登記。
+每人限登記一次，祝你好運！</p>
   </section>
 
   <section class="card form" id="formCard">
-    <h2 data-t="reg.formTitle">學生報名</h2>
+    <h2 data-t="reg.formTitle">學生登記</h2>
     <p class="sub" data-t="reg.formSub">請輸入學號與姓名，系統會自動比對在校生名單</p>
     <div id="err" class="msg err" hidden></div>
     <form id="f" novalidate autocomplete="on">
@@ -61,7 +61,7 @@
         <label for="name"><span data-t="reg.name">姓名</span><span class="req">*</span></label>
         <input class="input" id="name" name="name" type="text" autocomplete="name" maxlength="40" data-tp="reg.namePh" placeholder="請輸入本人姓名">
       </div>
-      <button class="btn-gold submit" id="submit" type="submit" data-t="reg.submit">送出並報名</button>
+      <button class="btn-gold submit" id="submit" type="submit" data-t="reg.submit">送出並登記</button>
       <p class="privacy"><span class="lock">🔒 <span data-t="reg.privacy">系統僅比對學號與姓名是否相符於本次活動匯入的在校生名單，不會另外收集密碼。資料僅用於本次抽獎活動。</span></span></p>
     </form>
   </section>
@@ -72,8 +72,8 @@
   </section>
 
   <section class="card closed" id="closed" hidden>
-    <h2 data-t="reg.closedTitle">報名已截止</h2>
-    <p data-t="reg.closedText">本次活動已停止報名，感謝你的關注。</p>
+    <h2 data-t="reg.closedTitle">登記已截止</h2>
+    <p data-t="reg.closedText">本次活動已停止登記，感謝你的關注。</p>
   </section>
 </main>
 
@@ -126,7 +126,7 @@ $('#f').addEventListener('submit', async (e) => {
   try {
     const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentNo, name }) });
     const d = await r.json();
-    if (!r.ok) return showErr(d.error || '報名失敗，請稍後再試。', d.field);
+    if (!r.ok) return showErr(d.error || '登記失敗，請稍後再試。', d.field);
     already = !!d.already;
     doneData = { name: d.name, no: d.no };
     renderDynamic();
