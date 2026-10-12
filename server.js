@@ -30,7 +30,7 @@ if (!ADMIN_PASSWORD) {
 }
 
 // ---------- 資料 ----------
-const EMPTY = { settings: { title: '世新大學在校生抽獎活動', open: true, maskName: false, prize: '', showFsBtn: false }, design: { vars: {}, texts: {}, customCss: '', assets: {} }, entries: [], winners: [], roster: [], rosterImportedAt: null };
+const EMPTY = { settings: { title: '世新大學在校生抽獎活動', open: true, maskName: false, prize: '', showFsBtn: false, musicStyle: 'edm' }, design: { vars: {}, texts: {}, customCss: '', assets: {} }, entries: [], winners: [], roster: [], rosterImportedAt: null };
 let db = EMPTY;
 if (fs.existsSync(DB_FILE)) {
   try { const saved = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); db = { ...EMPTY, ...saved, settings: { ...EMPTY.settings, ...saved.settings }, design: { ...EMPTY.design, assets: {}, ...saved.design }, roster: saved.roster || [] }; } catch (e) { console.error('db.json 讀取失敗，另存備份', e); fs.copyFileSync(DB_FILE, DB_FILE + '.broken-' + Date.now()); }
@@ -99,6 +99,21 @@ const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u001f<>]/g, '').trim
 
 // ---------- 工具 ----------
 const sessions = new Map(); // token -> 到期時間
+// 登入一次 30 天內有效（用了就再延長）；登入狀態存到 data/sessions.json，伺服器重開也不會被登出
+const ADMIN_TTL = 30 * 24 * 3600_000;
+const SESSION_FILE = path.join(DATA_DIR, 'sessions.json');
+try {
+  for (const [t, exp] of Object.entries(JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8')))) if (exp > Date.now()) sessions.set(t, exp);
+} catch {}
+let sessionSaveTimer = null;
+function saveSessions() { // 1 秒內的多次變更合併成一次寫檔
+  if (sessionSaveTimer) return;
+  sessionSaveTimer = setTimeout(() => {
+    sessionSaveTimer = null;
+    try { fs.writeFileSync(SESSION_FILE + '.tmp', JSON.stringify(Object.fromEntries(sessions))); fs.renameSync(SESSION_FILE + '.tmp', SESSION_FILE); }
+    catch (e) { console.error('登入狀態存檔失敗', e); }
+  }, 1000);
+}
 const rate = new Map();     // ip -> [時間戳]
 function limited(ip, max = 20, windowMs = 60_000) {
   const now = Date.now();
@@ -127,7 +142,8 @@ function isAdmin(req) {
   const t = cookie(req, 'sid');
   const exp = t && sessions.get(t);
   if (!exp || exp < Date.now()) return false;
-  sessions.set(t, Date.now() + 12 * 3600_000);
+  sessions.set(t, Date.now() + ADMIN_TTL);
+  saveSessions();
   return true;
 }
 // 設計後台獨立登入：就算已登入後台，進 /design 也要再輸入密碼；2 小時後失效，不會自動延長
@@ -339,8 +355,8 @@ async function handle(req, res) {
       designSessions.set(t, Date.now() + DESIGN_TTL);
       return send(res, 200, { ok: true }, { 'Set-Cookie': `dsid=${t}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${DESIGN_TTL / 1000}` });
     }
-    sessions.set(t, Date.now() + 12 * 3600_000);
-    return send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${t}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200` });
+    sessions.set(t, Date.now() + ADMIN_TTL); saveSessions();
+    return send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${t}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${ADMIN_TTL / 1000}` });
   }
   if (p.startsWith('/api/admin/')) {
     // 設計相關 API 只認設計後台的登入；其他後台 API 只認後台登入
@@ -348,7 +364,7 @@ async function handle(req, res) {
     if (m === 'POST' && p === '/api/admin/design-logout') { designSessions.delete(cookie(req, 'dsid')); return send(res, 200, { ok: true }, { 'Set-Cookie': 'dsid=; Path=/; Max-Age=0' }); }
     const winnerSet = new Set(db.winners.map((w) => w.entryId));
 
-    if (m === 'POST' && p === '/api/admin/logout') { sessions.delete(cookie(req, 'sid')); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; Path=/; Max-Age=0' }); }
+    if (m === 'POST' && p === '/api/admin/logout') { sessions.delete(cookie(req, 'sid')); saveSessions(); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; Path=/; Max-Age=0' }); }
     if (m === 'GET' && p === '/api/admin/state') {
       return send(res, 200, {
         roster: { count: db.roster.length, importedAt: db.rosterImportedAt },
@@ -458,6 +474,7 @@ async function handle(req, res) {
       if (typeof b.open === 'boolean') db.settings.open = b.open;
       if (typeof b.maskName === 'boolean') db.settings.maskName = b.maskName;
       if (typeof b.showFsBtn === 'boolean') db.settings.showFsBtn = b.showFsBtn;
+      if (['edm', 'drums', 'rock'].includes(b.musicStyle)) db.settings.musicStyle = b.musicStyle; // 抽獎配樂風格
       if (typeof b.title === 'string' && b.title.trim()) db.settings.title = clean(b.title, 60);
       if (typeof b.prize === 'string') db.settings.prize = clean(b.prize, 30); // 可留空
       save(); return send(res, 200, { ok: true, settings: db.settings });
@@ -549,7 +566,7 @@ server.on('clientError', (err, socket) => {            // 壞掉的連線不要�
 setInterval(() => {
   const now = Date.now();
   for (const [k, arr] of rate) { const live = arr.filter((t) => now - t < 60_000); live.length ? rate.set(k, live) : rate.delete(k); }
-  for (const [t, exp] of sessions) if (exp < now) sessions.delete(t);
+  for (const [t, exp] of sessions) if (exp < now) { sessions.delete(t); saveSessions(); }
   for (const [t, exp] of designSessions) if (exp < now) designSessions.delete(t);
 }, 300_000).unref();
 

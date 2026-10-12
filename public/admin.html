@@ -64,6 +64,17 @@
     .grid3 { grid-template-columns: 1fr; }
     .panel { padding: 20px 16px; }
   }
+  /* 抽獎配樂風格：三張卡片選一張，每張可以先試聽 */
+  .music-pick { margin-top: 18px; }
+  .music-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 8px; }
+  .music-opt { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 12px 44px; border-radius: 14px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.12); background: rgba(40,2,6,.4); transition: border-color .15s, background .15s; }
+  .music-opt input { position: absolute; left: 16px; top: 17px; width: 18px; height: 18px; accent-color: var(--gold); }
+  .music-opt b { font-size: 18px; color: var(--gold-hi); letter-spacing: .05em; }
+  .music-opt small { color: var(--muted); line-height: 1.55; }
+  .music-opt .btn-ghost { align-self: flex-start; margin-top: 4px; padding: 4px 14px; }
+  .music-opt:has(input:checked) { border-color: var(--gold); background: rgba(216,172,90,.12); }
+  @media (max-width: 900px) { .music-opts { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -104,6 +115,23 @@
         <label class="switch"><span>投影時遮蔽姓名中間字</span><input type="checkbox" id="maskName"></label>
         <label class="switch"><span>抽獎畫面顯示「全螢幕」按鈕<small>（關閉後仍可按 F 鍵全螢幕、Esc 離開）</small></span><input type="checkbox" id="showFsBtn"></label>
         <label class="switch"><span>開放學生報名</span><input type="checkbox" id="openReg"></label>
+      </div>
+      <div class="music-pick">
+        <span class="label">抽獎配樂風格<span class="opt">按「試聽」先聽一段（約 15 秒），選好後按「儲存設定」，抽獎畫面約 4 秒內換過去</span></span>
+        <div class="music-opts">
+          <label class="music-opt"><input type="radio" name="musicStyle" value="edm">
+            <b>① 電音舞曲</b>
+            <small>128 BPM｜四拍大鼓、電子琶音、合成器和弦。像演唱會、跨年晚會的電音派對，最有現代感。</small>
+            <button type="button" class="btn-ghost" data-demo="edm">▶ 試聽</button></label>
+          <label class="music-opt"><input type="radio" name="musicStyle" value="drums">
+            <b>② 熱血戰鼓</b>
+            <small>140 BPM｜節慶大鼓陣、銅管齊奏、大鑼。像廟會陣頭、運動會開幕，氣勢最磅礡。</small>
+            <button type="button" class="btn-ghost" data-demo="drums">▶ 試聽</button></label>
+          <label class="music-opt"><input type="radio" name="musicStyle" value="rock">
+            <b>③ 綜藝搖滾</b>
+            <small>150 BPM｜破音電吉他、爵士鼓、吉他主旋律。像綜藝節目闖關、開獎現場，節奏最快最熱血。</small>
+            <button type="button" class="btn-ghost" data-demo="rock">▶ 試聽</button></label>
+        </div>
       </div>
       <div class="save-row">
         <span class="hint" id="settingsHint"></span>
@@ -544,6 +572,8 @@ function fillSettings() {
   $('#maskName').checked = state.settings.maskName;
   $('#showFsBtn').checked = !!state.settings.showFsBtn;
   $('#openReg').checked = state.settings.open;
+  const ms = document.querySelector(`input[name=musicStyle][value="${state.settings.musicStyle || 'edm'}"]`);
+  if (ms) ms.checked = true;
 }
 function markDirty(on) {
   settingsDirty = on;
@@ -554,11 +584,27 @@ function markDirty(on) {
 }
 ['#prize', '#maskName', '#showFsBtn', '#openReg'].forEach((id) => $(id).addEventListener('input', () => markDirty(true)));
 ['#maskName', '#showFsBtn', '#openReg'].forEach((id) => $(id).addEventListener('change', () => markDirty(true)));
+document.querySelectorAll('input[name=musicStyle]').forEach((el) => el.addEventListener('change', () => markDirty(true)));
+// 試聽：用抽獎畫面同一套配樂引擎（/assets/music.js）播一段；再按一次停止
+let demoTimer = 0, demoBtn = null;
+function stopDemo() {
+  clearTimeout(demoTimer); window.LotteryMusic?.stop();
+  if (demoBtn) demoBtn.textContent = '▶ 試聽';
+  demoBtn = null;
+}
+document.querySelectorAll('[data-demo]').forEach((btn) => btn.addEventListener('click', (e) => {
+  e.preventDefault(); // 按鈕在 label 裡，不要順便把選項勾起來
+  const again = demoBtn === btn;
+  stopDemo();
+  if (again || !window.LotteryMusic) return;
+  demoBtn = btn; btn.textContent = '■ 停止';
+  demoTimer = setTimeout(stopDemo, window.LotteryMusic.demo(btn.dataset.demo));
+}));
 $('#cancelSettings').addEventListener('click', () => { fillSettings(); markDirty(false); });
 $('#saveSettings').addEventListener('click', async () => {
   const btn = $('#saveSettings'); btn.disabled = true; btn.textContent = '儲存中…';
   try {
-    state.settings = (await api('/api/admin/settings', { method: 'POST', body: { prize: $('#prize').value.trim(), maskName: $('#maskName').checked, showFsBtn: $('#showFsBtn').checked, open: $('#openReg').checked } })).settings;
+    state.settings = (await api('/api/admin/settings', { method: 'POST', body: { prize: $('#prize').value.trim(), maskName: $('#maskName').checked, showFsBtn: $('#showFsBtn').checked, open: $('#openReg').checked, musicStyle: document.querySelector('input[name=musicStyle]:checked')?.value } })).settings;
     fillSettings(); markDirty(false);
     $('#settingsHint').textContent = '✓ 已儲存（' + new Date().toLocaleTimeString('zh-TW', { hour12: false }) + '）';
     $('#settingsHint').style.color = 'var(--ok)';
@@ -572,5 +618,6 @@ setInterval(() => { if (!$('#app').hidden && !$('#tab-draw').hidden && document.
 
 load();
 </script>
+<script src="/assets/music.js"></script>
 </body>
 </html>
