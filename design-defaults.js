@@ -105,7 +105,7 @@ const texts = [
   { key: 'draw.drawing', group: '抽獎頁', label: '抽獎中按鈕', default: '抽獎中…' },
   { key: 'draw.allDone', group: '抽獎頁', label: '抽完時按鈕', default: '全部抽完了' },
   { key: 'draw.congrats', group: '抽獎頁', label: '中獎標語', default: '恭喜抽中' },
-  { key: 'draw.switchUrl', group: '抽獎頁', label: '按 Q／A 要切過去的另一場網址', default: 'http://localhost:8123/draw' },
+  { key: 'draw.switchUrl', group: '抽獎頁', label: '按 Q／A 要切過去的另一場網址', default: 'https://shu70-drawing-alumni.shu.edu.tw/draw' },
   { key: 'draw.switchLabel', group: '抽獎頁', label: '切換時的提示文字', default: '切到校友場' },
   { key: 'draw.deptEmpty', group: '抽獎頁', label: '中獎者沒有系所時顯示', default: '（未提供系所）' },
   { key: 'draw.former', group: '抽獎頁', label: '（未使用）原名前綴', default: '原名' },

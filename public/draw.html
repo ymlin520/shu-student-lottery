@@ -461,9 +461,9 @@ music.on('heart', () => { heartGlow(0.75); pulse($('.machine'), 1.025, 320); });
 async function switchScene() {
   if (drawing) return toast('抽獎進行中，先抽完再切換'); // 防誤觸
   let url = (window.T ? T('draw.switchUrl') : '').trim();
-  // 現在不是用本機位址在看（例如用 Cloudflare 臨時網址投影），就改切到對方「目前」的臨時網址。
-  // 臨時網址每次重開都會變，所以跟伺服器要即時的，不用手動維護。
-  if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+  // 用 Cloudflare 臨時網址投影時，改切到對方「目前」的臨時網址（每次重開都會變，跟伺服器要即時的）。
+  // 正式網址（shu.edu.tw）或本機就直接用設計後台設定的網址。
+  if (/\.trycloudflare\.com$/.test(location.hostname)) {
     try {
       const d = await fetch('/api/admin/switch-url').then((r) => r.json());
       if (d && d.url) url = d.url;
