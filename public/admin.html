@@ -81,7 +81,7 @@
 <header class="topbar">
   <div class="brand"><img class="brand-logo" src="/brand/logo" data-asset="logo" alt="Logo"><span>在校生抽獎後台</span></div>
   <div id="nav" hidden style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-    <div class="tabs"><button class="on" data-tab="draw">抽獎管理</button><button data-tab="roster">在校生名單</button><button data-tab="list">報名名單</button><a href="/design" target="_blank">設計 ↗</a></div>
+    <div class="tabs"><button class="on" data-tab="draw">抽獎管理</button><button data-tab="roster">在校生名單</button><button data-tab="list">報名名單</button><a href="/winners" target="_blank">中獎紀錄 ↗</a><a href="/design" target="_blank">設計 ↗</a></div>
     <button class="btn-ghost" id="logout">登出</button>
   </div>
 </header>
@@ -141,6 +141,10 @@
       <div class="field" style="margin:18px 0 0">
         <span class="label">學生報名網址（可轉成 QR Code 給學生掃）</span>
         <div class="link-box"><code id="regUrl"></code><button class="btn-ghost" id="copyUrl">複製</button></div>
+      </div>
+      <div class="field" style="margin:14px 0 0">
+        <span class="label">中獎紀錄網址（獨立頁面、只能看不能改，用中獎紀錄頁自己的密碼登入；<span id="winCount">—</span>）</span>
+        <div class="link-box"><code id="winListUrl"></code><button class="btn-ghost" id="copyWinUrl">複製</button><a class="btn-ghost" href="/winners" target="_blank" style="text-decoration:none">開啟中獎紀錄 ↗</a></div>
       </div>
     </section>
 
@@ -352,6 +356,8 @@ async function load() {
   if (!settingsDirty) fillSettings();
   $('#regUrl').textContent = location.origin + '/';
   $('#drawUrl').textContent = location.origin + '/draw';
+  $('#winListUrl').textContent = location.origin + '/winners';
+  $('#winCount').textContent = state.winners.length + ' 筆';
   renderRosterInfo(state.roster || {});
   renderAll();
 }
@@ -613,6 +619,7 @@ $('#saveSettings').addEventListener('click', async () => {
 });
 window.addEventListener('beforeunload', (e) => { if (settingsDirty) e.preventDefault(); });
 $('#copyUrl').addEventListener('click', () => { navigator.clipboard?.writeText($('#regUrl').textContent); $('#copyUrl').textContent = '已複製'; setTimeout(() => $('#copyUrl').textContent = '複製', 1500); });
+$('#copyWinUrl').addEventListener('click', () => { navigator.clipboard?.writeText($('#winListUrl').textContent); $('#copyWinUrl').textContent = '已複製'; setTimeout(() => $('#copyWinUrl').textContent = '複製', 1500); });
 // 抽獎畫面抽出的結果自動更新到中獎紀錄
 setInterval(() => { if (!$('#app').hidden && !$('#tab-draw').hidden && document.visibilityState === 'visible') load(); }, 5000);
 

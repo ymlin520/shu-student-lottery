@@ -28,6 +28,16 @@ if (!ADMIN_PASSWORD) {
     fs.writeFileSync(PW_FILE, ADMIN_PASSWORD + '\n');
   }
 }
+// 中獎紀錄頁（/winners）用自己的密碼，只能看中獎名單、進不了後台
+const WIN_PW_FILE = path.join(ROOT, 'winners-password.txt');
+let WINNERS_PASSWORD = process.env.WINNERS_PASSWORD;
+if (!WINNERS_PASSWORD) {
+  if (fs.existsSync(WIN_PW_FILE)) WINNERS_PASSWORD = fs.readFileSync(WIN_PW_FILE, 'utf8').trim();
+  else {
+    WINNERS_PASSWORD = 'win' + crypto.randomInt(100000, 999999);
+    fs.writeFileSync(WIN_PW_FILE, WINNERS_PASSWORD + '\n');
+  }
+}
 
 // ---------- 資料 ----------
 const EMPTY = { settings: { title: '世新大學在校生抽獎活動', open: true, maskName: false, prize: '', showFsBtn: false, musicStyle: 'edm' }, design: { vars: {}, texts: {}, customCss: '', assets: {} }, entries: [], winners: [], roster: [], rosterImportedAt: null };
@@ -153,6 +163,15 @@ function isDesigner(req) {
   const t = cookie(req, 'dsid');
   const exp = t && designSessions.get(t);
   if (!exp || exp < Date.now()) { if (t) designSessions.delete(t); return false; }
+  return true;
+}
+// 中獎紀錄頁獨立登入：只能讀中獎名單；12 小時後失效
+const winnerSessions = new Map(); // token -> 到期時間
+const WINNERS_TTL = 12 * 3600_000;
+function isWinnerViewer(req) {
+  const t = cookie(req, 'wsid');
+  const exp = t && winnerSessions.get(t);
+  if (!exp || exp < Date.now()) { if (t) winnerSessions.delete(t); return false; }
   return true;
 }
 const DESIGN_APIS = new Set(['/api/admin/design', '/api/admin/upload', '/api/admin/design-logout']);
@@ -325,6 +344,7 @@ async function handle(req, res) {
   if (m === 'GET' && (p === '/admin' || p === '/admin/')) return serveStatic(req, res, 'admin.html');
   if (m === 'GET' && (p === '/draw' || p === '/draw/')) return serveStatic(req, res, 'draw.html');
   if (m === 'GET' && (p === '/design' || p === '/design/')) return serveStatic(req, res, 'design.html');
+  if (m === 'GET' && (p === '/winners' || p === '/winners/')) return serveStatic(req, res, 'winners.html');
   if (m === 'GET' && /^\/assets\/[\w.-]+$/.test(p)) return serveStatic(req, res, p.slice(1));
   let bm;
   if (m === 'GET' && (bm = p.match(/^\/brand\/([a-z]+)$/))) return serveBrand(req, res, bm[1], url.searchParams.has('default'));
@@ -342,6 +362,23 @@ async function handle(req, res) {
     if (limited('all', 3000)) return send(res, 429, { error: '目前報名人數太多，請稍等幾秒再送出一次。' });
     const r = rosterLogin(b.studentNo, b.name);
     return send(res, r.code, r.body);
+  }
+
+  // 中獎紀錄頁（/winners）：獨立密碼、唯讀
+  if (m === 'POST' && p === '/api/winners/login') {
+    if (limited('login:' + clientIp(req), 10)) return send(res, 429, { error: '嘗試太多次，請稍候一分鐘。' });
+    let b; try { b = await readBody(req); } catch { return send(res, 400, { error: '資料格式錯誤' }); }
+    const a = Buffer.from(String(b.password || '')), c = Buffer.from(WINNERS_PASSWORD);
+    if (a.length !== c.length || !crypto.timingSafeEqual(a, c)) return send(res, 401, { error: '密碼錯誤' });
+    const t = crypto.randomBytes(24).toString('hex');
+    winnerSessions.set(t, Date.now() + WINNERS_TTL);
+    return send(res, 200, { ok: true }, { 'Set-Cookie': `wsid=${t}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${WINNERS_TTL / 1000}` });
+  }
+  if (m === 'POST' && p === '/api/winners/logout') { winnerSessions.delete(cookie(req, 'wsid')); return send(res, 200, { ok: true }, { 'Set-Cookie': 'wsid=; Path=/; Max-Age=0' }); }
+  if (m === 'GET' && p === '/api/winners') {
+    // 已登入後台的人從後台點過來不用再輸入密碼
+    if (!isWinnerViewer(req) && !isAdmin(req)) return send(res, 401, { error: '請先登入' });
+    return send(res, 200, { title: db.settings.title, winners: db.winners });
   }
 
   // 後台登入

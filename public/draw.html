@@ -363,6 +363,7 @@ async function load() {
   if (DESIGN_PREVIEW) info = { settings: { prize: '頭獎', maskName: false }, remaining: 30 };
   else try { info = await api('/api/admin/draw-info'); } catch { return; }
   $('#stage').hidden = false; $('#actions').hidden = false;
+  tryAutoplay();
   fitStage();
   render();
 }
@@ -414,7 +415,7 @@ function applyMusicSettings() {
   if (!drawing) music.setStyle(info?.settings?.musicStyle || 'edm', cssNum('--music-tempo', 1));
 }
 // 瀏覽器規定要有使用者操作才能出聲：任何點擊或按鍵都順便把音樂打開
-['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => { if (!$('#stage').hidden) music.unlock(); }, true));
+['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => { if (!$('#stage').hidden) { if (music.blocked) $('#toast')?.classList.remove('show'); music.unlock(); } }, true));
 document.addEventListener('designchange', applyMusicSettings);
 
 // 跟著節拍動的畫面效果。composite: 'add' 疊加在元素原本的動畫上，不會蓋掉原本的位移與晃動
@@ -481,13 +482,20 @@ function toggleSfx() {
   toast(sfxOn ? '🔊 音樂開' : '🔇 音樂關');
 }
 let toastTimer = 0;
-function toast(msg) {
+function toast(msg, ms = 1400) {
   let el = $('#toast');
   if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; document.body.appendChild(el); }
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 1400);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+// 網頁一打開就試著放音樂：投影電腦的瀏覽器允許自動播放就直接有聲音；
+// 被擋下的話提示點一下或按任意鍵（第一次互動時 music.unlock() 會把聲音打開）
+function tryAutoplay() {
+  if (DESIGN_PREVIEW || !sfxOn) return;
+  music.unlock();
+  setTimeout(() => { if (music.blocked && sfxOn) toast('🔈 點一下畫面或按任意鍵開啟音樂', 8000); }, 800);
 }
 
 // ---------- 彩球物理 ----------

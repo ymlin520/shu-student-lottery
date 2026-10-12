@@ -637,6 +637,8 @@
       }
     },
     get running() { return running; },
+    // 瀏覽器還沒允許出聲（自動播放被擋，要等使用者點一下／按一個鍵）
+    get blocked() { return !ctx || ctx.state !== 'running'; },
     beatMs: () => spb * 1000,
     beatNow: () => (nowSec() - t0) / spb,
     // 下一個整拍（至少留 lead 秒，讓排程器來得及排）
