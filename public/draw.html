@@ -141,7 +141,7 @@
   .reveal { position: absolute; inset: 0; z-index: 25; pointer-events: none; display: flex; justify-content: center; align-items: flex-start;
     padding: var(--reveal-top, calc(14 * var(--vh))) calc(1 * var(--vw)) 0; opacity: 0; transition: opacity .5s; }
   .reveal.show { opacity: 1; }
-  .reveal::before { content: ""; position: absolute; inset: 0; z-index: -1;
+  .reveal::before { display: none; /* 揭曉底色改由舞台層的 .stage-bg 鋪滿整個螢幕，見下方 */
     background: radial-gradient(ellipse 75% 60% at 50% 30%, rgba(20, 0, 2, var(--reveal-backdrop, .84)), rgba(20, 0, 2, calc(var(--reveal-backdrop, .84) * .72)) 55%, rgba(20, 0, 2, calc(var(--reveal-backdrop, .84) * .36))); }
   .reveal-inner { text-align: center; max-width: 100%; }
   .reveal .lbl { color: var(--text); font-size: clamp(43px, calc(2.3 * var(--vw)), 68px); font-weight: 700; letter-spacing: .35em; text-shadow: 0 4px 21px rgba(0,0,0,.5); }
@@ -176,6 +176,12 @@
     85% { opacity: 1; transform: scale(1.07); filter: none; }
     100% { opacity: 1; transform: none; filter: none; }
   }
+  /* 以下幾層放在舞台（整個螢幕）上，不在縮放版面裡，所以版面比例跟螢幕不同時也一樣滿版 */
+  .stage-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .6s;
+    background: radial-gradient(ellipse 70% 80% at 50% 40%, rgba(34, 3, 7, var(--reveal-backdrop, .92)), rgba(6, 0, 1, var(--reveal-backdrop, .92)) 75%); }
+  .stage.revealing .stage-bg { opacity: 1; }
+  .confetti-layer { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+  .canvas { z-index: 2; }
   /* 跟著音樂節拍閃的光、心跳時的暗紅邊框（不透明度由 JS 依節拍播放） */
   .beat-flash, .vignette { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
   .beat-flash { z-index: 27; background: radial-gradient(ellipse 70% 60% at 50% 45%, rgba(255, 228, 160, .55), rgba(255, 190, 90, .18) 50%, transparent 78%); }
@@ -211,8 +217,9 @@
   @keyframes trayGlow { 50% { box-shadow: inset -17px -21px 38px rgba(0,0,0,.25), 0 0 73px rgba(255, 220, 140, .9), 0 0 0 9px rgba(255,255,255,.25); } }
   .tray-ball.waiting span { animation: blink 1s ease-in-out infinite; }
   @keyframes pop { from { transform: scale(.6); } }
-  .confetti { position: absolute; top: -26px; width: 19px; height: 30px; z-index: 20; pointer-events: none; animation: fall linear forwards; }
-  @keyframes fall { to { transform: translateY(calc(110 * var(--vh))) rotate(720deg); opacity: .8; } }
+  /* 彩帶灑在整個螢幕（舞台層），大小跟著版面縮放 */
+  .confetti { position: absolute; top: -40px; width: calc(19px * var(--stage-scale, 1) + 4px); height: calc(30px * var(--stage-scale, 1) + 6px); pointer-events: none; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(calc(100vh + 60px)) rotate(720deg); opacity: .8; } }
   @media (max-width: 760px) { #fsBtn { display: none; } }
 </style>
 </head>
@@ -237,6 +244,8 @@
 </section>
 
 <main class="stage" id="stage" hidden>
+ <div class="stage-bg" aria-hidden="true"></div>
+ <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
  <div class="canvas" id="canvas">
   <h2 data-t="draw.heading">今天的幸運同學是誰？</h2>
   <div class="machine">
@@ -340,7 +349,7 @@ function fitStage() {
   const safe = Math.min(sw / (w * 0.86), sh / (h * 0.88));
   const cover = Math.max(sw / w, sh / h); // 填滿螢幕就夠了，不要再放大（版面尺寸剛好時＝1:1）
   const s = Math.min(safe, cover);
-  if (s > 0) cv.style.setProperty('--stage-scale', s);
+  if (s > 0) { cv.style.setProperty('--stage-scale', s); st.style.setProperty('--stage-scale', s); }
   centerTrayBall();
 }
 // 量出「承接槽的球」要往上移多少才會落在版面正中央，寫進 --tray-ball-dy
@@ -715,7 +724,7 @@ function confetti(n = 120) {
     c.style.animationDuration = 2.2 + Math.random() * 2 + 's';
     c.style.animationDelay = Math.random() * .5 + 's';
     c.style.borderRadius = Math.random() > .5 ? '50%' : '4px';
-    $('#canvas').appendChild(c);
+    $('#confettiLayer').appendChild(c);
     setTimeout(() => c.remove(), 5000);
   }
 }
