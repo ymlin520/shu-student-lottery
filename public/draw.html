@@ -153,7 +153,7 @@
   /* 版面四周 6～7% 會被裁掉（見 fitStage 的 safe 計算），這裡要放在裁切線以內才不會被切到看不見 */
   /* 揭曉畫面角落的學號：字級與位置都可以在設計後台調 */
   /* 數字由設計後台的拉條給，單位在這裡補上 */
-  .reveal .sid { position: fixed; right: calc(var(--winner-id-right, 9) * var(--vw)); bottom: calc(var(--winner-id-bottom, 8) * var(--vh)); z-index: 30;
+  .reveal .sid { position: fixed; right: calc(var(--winner-id-right, 3) * var(--vw)); bottom: calc(var(--winner-id-bottom, 14) * var(--vh)); z-index: 30;
     font-size: calc(var(--winner-id-size, 80) * 1px); color: var(--muted); opacity: .8; letter-spacing: .08em; }
   .nm-wrap { position: relative; display: inline-block; isolation: isolate; margin-top: var(--name-gap, calc(3.5 * var(--vh))); }
   .reveal .nm { font-size: var(--winner-size); line-height: 1.12; font-weight: 900; font-family: var(--font-display); white-space: nowrap;
