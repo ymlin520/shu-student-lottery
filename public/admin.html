@@ -115,7 +115,9 @@
         <label class="switch"><span>投影時遮蔽姓名中間字</span><input type="checkbox" id="maskName"></label>
         <label class="switch"><span>抽獎畫面顯示「全螢幕」按鈕<small>（關閉後仍可按 F 鍵全螢幕、Esc 離開）</small></span><input type="checkbox" id="showFsBtn"></label>
         <label class="switch"><span>開放學生報名</span><input type="checkbox" id="openReg"></label>
+        <label class="switch"><span>查無學號也顯示「已完成登記」<small>（不寫入名單、不參加抽獎；學號正確但姓名打錯一律照樣登記）</small></span><input type="checkbox" id="lenientPass"></label>
       </div>
+      <p class="sub" id="lenientNote" style="margin:12px 0 0" hidden></p>
       <div class="music-pick">
         <span class="label">抽獎配樂風格<span class="opt">按「試聽」先聽一段（約 15 秒），選好後按「儲存設定」，抽獎畫面約 4 秒內換過去</span></span>
         <div class="music-opts">
@@ -578,6 +580,11 @@ function fillSettings() {
   $('#maskName').checked = state.settings.maskName;
   $('#showFsBtn').checked = !!state.settings.showFsBtn;
   $('#openReg').checked = state.settings.open;
+  $('#lenientPass').checked = !!state.settings.lenientPass;
+  const n = state.settings.lenientCount || 0;
+  $('#lenientNote').hidden = !state.settings.lenientPass && !n;
+  $('#lenientNote').innerHTML = '目前已放行 <b>' + n + '</b> 個查無學號的號碼（只記加密雜湊用來判斷重複，不留其他資料）。'
+    + (n ? ' <button class="btn-ghost" id="resetLenient" style="padding:3px 10px;margin-left:6px">次數歸零</button>' : '');
   const ms = document.querySelector(`input[name=musicStyle][value="${state.settings.musicStyle || 'edm'}"]`);
   if (ms) ms.checked = true;
 }
@@ -588,8 +595,8 @@ function markDirty(on) {
   $('#settingsHint').textContent = on ? '有尚未儲存的變更' : '';
   $('#settingsHint').style.color = on ? 'var(--gold-hi)' : '';
 }
-['#prize', '#maskName', '#showFsBtn', '#openReg'].forEach((id) => $(id).addEventListener('input', () => markDirty(true)));
-['#maskName', '#showFsBtn', '#openReg'].forEach((id) => $(id).addEventListener('change', () => markDirty(true)));
+['#prize', '#maskName', '#showFsBtn', '#openReg', '#lenientPass'].forEach((id) => $(id).addEventListener('input', () => markDirty(true)));
+['#maskName', '#showFsBtn', '#openReg', '#lenientPass'].forEach((id) => $(id).addEventListener('change', () => markDirty(true)));
 document.querySelectorAll('input[name=musicStyle]').forEach((el) => el.addEventListener('change', () => markDirty(true)));
 // 試聽：用抽獎畫面同一套配樂引擎（/assets/music.js）播一段；再按一次停止
 let demoTimer = 0, demoBtn = null;
@@ -606,11 +613,17 @@ document.querySelectorAll('[data-demo]').forEach((btn) => btn.addEventListener('
   demoBtn = btn; btn.textContent = '■ 停止';
   demoTimer = setTimeout(stopDemo, window.LotteryMusic.demo(btn.dataset.demo));
 }));
+// 放行次數歸零（按鈕是動態畫出來的，用事件委派）
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('#resetLenient')) return;
+  state.settings = (await api('/api/admin/settings', { method: 'POST', body: { resetLenientCount: true } }).catch((err) => { alert(err.message); return { settings: state.settings }; })).settings;
+  fillSettings();
+});
 $('#cancelSettings').addEventListener('click', () => { fillSettings(); markDirty(false); });
 $('#saveSettings').addEventListener('click', async () => {
   const btn = $('#saveSettings'); btn.disabled = true; btn.textContent = '儲存中…';
   try {
-    state.settings = (await api('/api/admin/settings', { method: 'POST', body: { prize: $('#prize').value.trim(), maskName: $('#maskName').checked, showFsBtn: $('#showFsBtn').checked, open: $('#openReg').checked, musicStyle: document.querySelector('input[name=musicStyle]:checked')?.value } })).settings;
+    state.settings = (await api('/api/admin/settings', { method: 'POST', body: { prize: $('#prize').value.trim(), maskName: $('#maskName').checked, showFsBtn: $('#showFsBtn').checked, open: $('#openReg').checked, lenientPass: $('#lenientPass').checked, musicStyle: document.querySelector('input[name=musicStyle]:checked')?.value } })).settings;
     fillSettings(); markDirty(false);
     $('#settingsHint').textContent = '✓ 已儲存（' + new Date().toLocaleTimeString('zh-TW', { hour12: false }) + '）';
     $('#settingsHint').style.color = 'var(--ok)';

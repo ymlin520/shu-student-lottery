@@ -90,7 +90,7 @@ function showView(v) {
 function renderDynamic() {
   document.title = T('reg.title');
   $('#doneTitle').textContent = T(already ? 'reg.againTitle' : 'reg.doneTitle');
-  $('#doneIcon').textContent = already ? '★' : '✓';
+  $('#doneIcon').textContent = '✓';
 }
 renderDynamic();
 document.addEventListener('designchange', renderDynamic);

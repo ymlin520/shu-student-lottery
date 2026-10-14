@@ -40,7 +40,7 @@ if (!WINNERS_PASSWORD) {
 }
 
 // ---------- 資料 ----------
-const EMPTY = { settings: { title: '世新大學在校生抽獎活動', open: true, maskName: false, prize: '', showFsBtn: false, musicStyle: 'edm' }, design: { vars: {}, texts: {}, customCss: '', assets: {} }, entries: [], winners: [], roster: [], rosterImportedAt: null };
+const EMPTY = { settings: { title: '世新大學在校生抽獎活動', open: true, maskName: false, prize: '', showFsBtn: false, musicStyle: 'edm', lenientPass: true, lenientCount: 0 }, design: { vars: {}, texts: {}, customCss: '', assets: {} }, entries: [], winners: [], roster: [], rosterImportedAt: null };
 let db = EMPTY;
 if (fs.existsSync(DB_FILE)) {
   try { const saved = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); db = { ...EMPTY, ...saved, settings: { ...EMPTY.settings, ...saved.settings }, design: { ...EMPTY.design, assets: {}, ...saved.design }, roster: saved.roster || [] }; } catch (e) { console.error('db.json 讀取失敗，另存備份', e); fs.copyFileSync(DB_FILE, DB_FILE + '.broken-' + Date.now()); }
@@ -301,6 +301,15 @@ function serveStatic(req, res, file) {
 }
 
 // ---------- 報名登記：學號＋姓名比對在校生名單 ----------
+// 寬鬆放行的號碼只記 HMAC 雜湊（不存號碼本身、無法反推），只用來判斷「已重複登記」
+function lenientSeen(id) {
+  if (!db.lenientSalt) db.lenientSalt = crypto.randomBytes(16).toString('hex');
+  const h = crypto.createHmac('sha256', db.lenientSalt).update(id).digest('hex').slice(0, 32);
+  const list = db.lenientSeen || (db.lenientSeen = []);
+  if (list.includes(h)) return true;
+  list.push(h);
+  return false;
+}
 function rosterLogin(studentNoRaw, nameRaw) {
   if (!db.settings.open) return { code: 403, body: { error: '本次登記已截止，感謝您的參與。' } };
   const studentNo = clean(studentNoRaw, 20).toUpperCase().replace(/\s/g, '');
@@ -310,20 +319,32 @@ function rosterLogin(studentNoRaw, nameRaw) {
 
   const r = db.roster.find((x) => x.studentNo === studentNo);
   if (!r) {
+    // 寬鬆登記：名單查無這個學號時不擋，前台照樣顯示「已完成登記」，
+    // 但不建立任何資料、不進抽獎池，後台只累加一個次數。
+    if (db.settings.lenientPass) {
+      const again = lenientSeen(studentNo);
+      if (!again) db.settings.lenientCount = (db.settings.lenientCount || 0) + 1;
+      save(true);
+      console.log(`[查無學號・寬鬆放行${again ? '（重複）' : ''}] ${studentNo}`);
+      return { code: 200, body: { ok: true, already: again, no: '', name, dept: '', studentNo } };
+    }
     console.log(`[報名失敗] 查無學號 ${studentNo}`);
     return { code: 404, body: { error: '查無此學號，請確認輸入正確的學號。', field: 'account' } };
   }
-  if (normName(r.name) !== normName(name)) {
-    console.log(`[報名失敗] 學號 ${studentNo} 姓名不符（輸入：${name}）`);
-    return { code: 400, body: { error: '姓名有誤，請確認輸入與學籍資料相符的姓名。', field: 'name' } };
-  }
+  // 只核對學號：學號在名單裡就算報名成功，姓名打錯也照樣登記（名單上的姓名為準）。
+  // 姓名不符時回傳對方自己打的姓名、不帶系所與編號，免得用學號就能查出名單上的真名。
+  const nameOk = normName(r.name) === normName(name);
+  if (!nameOk) console.log(`[姓名不符・照樣登記] 學號 ${studentNo}（輸入：${name}，名單：${r.name}）`);
+  const reply = (e, already) => ({ code: 200, body: nameOk
+    ? { ok: true, already, no: e.no, name: e.name, dept: e.dept, studentNo: e.studentNo }
+    : { ok: true, already, no: '', name, dept: '', studentNo } });
 
   const already = db.entries.find((e) => e.studentNo === studentNo);
   if (already) {
     Object.assign(already, { lastLoginAt: new Date().toISOString(), loginCount: (already.loginCount || 1) + 1 });
     save(true);
     console.log(`[重複報名] ${already.studentNo} ${already.no}`);
-    return { code: 200, body: { ok: true, already: true, no: already.no, name: already.name, dept: already.dept, studentNo: already.studentNo } };
+    return reply(already, true);
   }
   const entry = addEntry({
     studentNo, name: r.name, dept: r.dept || '', className: '',
@@ -331,7 +352,7 @@ function rosterLogin(studentNoRaw, nameRaw) {
     source: 'roster', lastLoginAt: new Date().toISOString(), loginCount: 1,
   }, true); // 現場報名：走報到日誌＋延後合併寫檔
   console.log(`[報名成功] ${entry.studentNo} ${entry.no} ${entry.name}`);
-  return { code: 200, body: { ok: true, no: entry.no, name: entry.name, dept: entry.dept, studentNo: entry.studentNo } };
+  return reply(entry, false);
 }
 
 // ---------- 路由 ----------
@@ -357,7 +378,7 @@ async function handle(req, res) {
   if (m === 'POST' && p === '/api/login') {
     let b; try { b = await readBody(req); } catch { return send(res, 400, { error: '資料格式錯誤' }); }
     // 現場上千人共用校內 Wi-Fi 會是同一個對外 IP，所以流量限制改用「學號」為單位：
-    // 同一個學號每分鐘最多試 12 次（擋住猜姓名），不同人之間不會互相影響。
+    // 同一個學號每分鐘最多試 12 次（擋住亂試），不同人之間不會互相影響。
     if (limited('no:' + String(b.studentNo || '').toUpperCase().trim(), 12)) return send(res, 429, { error: '這個學號嘗試太多次，請稍候一分鐘再試，或洽現場服務台。', field: 'account' });
     if (limited('all', 3000)) return send(res, 429, { error: '目前登記人數太多，請稍等幾秒再送出一次。' });
     const r = rosterLogin(b.studentNo, b.name);
@@ -511,6 +532,8 @@ async function handle(req, res) {
       if (typeof b.open === 'boolean') db.settings.open = b.open;
       if (typeof b.maskName === 'boolean') db.settings.maskName = b.maskName;
       if (typeof b.showFsBtn === 'boolean') db.settings.showFsBtn = b.showFsBtn;
+      if (typeof b.lenientPass === 'boolean') db.settings.lenientPass = b.lenientPass; // 查無學號也顯示「已完成登記」
+      if (b.resetLenientCount === true) { db.settings.lenientCount = 0; db.lenientSeen = []; }
       if (['edm', 'drums', 'rock'].includes(b.musicStyle)) db.settings.musicStyle = b.musicStyle; // 抽獎配樂風格
       if (typeof b.title === 'string' && b.title.trim()) db.settings.title = clean(b.title, 60);
       if (typeof b.prize === 'string') db.settings.prize = clean(b.prize, 30); // 可留空
